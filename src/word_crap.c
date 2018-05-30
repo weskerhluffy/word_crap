@@ -1019,7 +1019,6 @@ static inline void heap_shit_actualiza(heap_shit *ctx, void *valor) {
 
 #if 1
 
-// XXX: https://lispmachine.wordpress.com/2009/05/13/queue-in-c/
 typedef struct my_struct {
 	void *valor;
 	struct my_struct* next;
@@ -1074,7 +1073,7 @@ struct my_list* list_add_element(struct my_list* s, void *valor) {
 }
 
 /* This is a queue and it is FIFO, so we will always remove the first element */
-static inline void *list_remove_element(struct my_list* s) {
+static void *list_remove_element(struct my_list* s) {
 	struct my_struct* h = NULL;
 	struct my_struct* p = NULL;
 	void *valor = NULL;
@@ -1142,26 +1141,32 @@ void list_print(const struct my_list* ps) {
 	printf("------------------\n");
 }
 
-static inline bool list_empty(struct my_list *s) {
+static bool list_empty(struct my_list *s) {
 	return !s->head;
 }
 
-static inline void list_iterador_init(listilla_fifo *ctx,
-		listilla_iterador *iter) {
+static void list_iterador_init(listilla_fifo *ctx, listilla_iterador *iter) {
+	assert_timeout(!iter->ctx);
+	assert_timeout(!iter->primera_llamada);
+	assert_timeout(!iter->nodo_act);
+	assert_timeout(!iter->llamadas);
 	iter->ctx = ctx;
 	iter->nodo_act = NULL;
 	iter->primera_llamada = verdadero;
 	iter->llamadas = 0;
 }
-static inline void list_iterador_fini(listilla_iterador *iter) {
+static void list_iterador_fini(listilla_iterador *iter) {
 	iter->ctx = NULL;
 	iter->nodo_act = NULL;
+	iter->primera_llamada = falso;
+	iter->llamadas = 0;
 }
 
-static inline void *list_iterador_peekea_actual(listilla_iterador *iter) {
+static void *list_iterador_peekea_actual(listilla_iterador *iter) {
 	return iter->nodo_act ? iter->nodo_act->valor : NULL;
 }
-static inline void *list_iterador_obten_siguiente(listilla_iterador *iter) {
+
+static void *list_iterador_obten_siguiente(listilla_iterador *iter) {
 	if (iter->nodo_act) {
 		iter->nodo_act = iter->nodo_act->next;
 	} else {
@@ -1174,6 +1179,22 @@ static inline void *list_iterador_obten_siguiente(listilla_iterador *iter) {
 		iter->llamadas++;
 	}
 	return iter->nodo_act ? iter->nodo_act->valor : NULL;
+}
+static void *list_iterador_hay_siguiente(listilla_iterador *iter) {
+	listilla_nodo *siguiente = NULL;
+	if (!iter->nodo_act) {
+		if (iter->primera_llamada) {
+			siguiente = iter->ctx->head;
+		}
+	} else {
+		siguiente = iter->nodo_act->next;
+	}
+
+	return siguiente ? siguiente->valor : NULL;
+}
+
+static bool list_iterador_esta_initializado(listilla_iterador *iter) {
+	return !!iter->ctx;
 }
 
 #endif
