@@ -365,6 +365,463 @@ static inline natural caca_comun_max_natural(natural *nums, natural nums_tam) {
 #endif
 
 #if 1
+
+#if 1
+
+#define XXH_PUBLIC_API   /* do nothing */
+#define FORCE_INLINE static
+#define XXH_FORCE_NATIVE_FORMAT 0
+
+#define XXH_rotl32(x,r) ((x << r) | (x >> (32 - r)))
+#define XXH_rotl64(x,r) ((x << r) | (x >> (64 - r)))
+
+typedef uint64_t U64;
+typedef uint8_t BYTE;
+typedef uint16_t U16;
+typedef uint32_t U32;
+
+static const U64 PRIME64_1 = 11400714785074694791ULL;
+static const U64 PRIME64_2 = 14029467366897019727ULL;
+static const U64 PRIME64_3 = 1609587929392839161ULL;
+static const U64 PRIME64_4 = 9650029242287828579ULL;
+static const U64 PRIME64_5 = 2870177450012600261ULL;
+
+typedef enum {
+	XXH_OK = 0, XXH_ERROR
+} XXH_errorcode;
+
+typedef enum {
+	XXH_bigEndian = 0, XXH_littleEndian = 1
+} XXH_endianess;
+
+typedef struct XXH64_state_s {
+	uint64_t total_len;
+	uint64_t v1;
+	uint64_t v2;
+	uint64_t v3;
+	uint64_t v4;
+	uint64_t mem64[4];
+	uint32_t memsize;
+	uint32_t reserved[2]; /* never read nor write, might be removed in a future version */
+} XXH64_state_t;
+/* typedef'd to XXH64_state_t */
+
+typedef enum {
+	XXH_aligned, XXH_unaligned
+} XXH_alignment;
+
+static void* XXH_malloc(size_t s) {
+	return malloc(s);
+}
+static void XXH_free(void* p) {
+	free(p);
+}
+/*! and for memcpy() */
+static void* XXH_memcpy(void* dest, const void* src, size_t size) {
+	return memcpy(dest, src, size);
+}
+
+static int XXH_isLittleEndian(void) {
+	const union {
+		U32 u;
+		BYTE c[4];
+	} one = { 1 }; /* don't use static : performance detrimental  */
+	return one.c[0];
+}
+#define XXH_CPU_LITTLE_ENDIAN   XXH_isLittleEndian()
+
+XXH_PUBLIC_API XXH64_state_t* XXH64_createState(void) {
+	return (XXH64_state_t*) XXH_malloc(sizeof(XXH64_state_t));
+}
+
+XXH_PUBLIC_API XXH_errorcode XXH64_reset(XXH64_state_t* statePtr,
+		unsigned long long seed) {
+	XXH64_state_t state; /* using a local state to memcpy() in order to avoid strict-aliasing warnings */
+	memset(&state, 0, sizeof(state));
+	state.v1 = seed + PRIME64_1 + PRIME64_2;
+	state.v2 = seed + PRIME64_2;
+	state.v3 = seed + 0;
+	state.v4 = seed - PRIME64_1;
+	/* do not write into reserved, planned to be removed in a future version */
+	memcpy(statePtr, &state, sizeof(state) - sizeof(state.reserved));
+	return XXH_OK;
+}
+
+static U64 XXH64_round(U64 acc, U64 input) {
+	acc += input * PRIME64_2;
+	acc = XXH_rotl64(acc, 31);
+	acc *= PRIME64_1;
+	return acc;
+}
+
+static U64 XXH_read64(const void* memPtr) {
+	U64 val;
+	memcpy(&val, memPtr, sizeof(val));
+	return val;
+}
+
+static U64 XXH_swap64(U64 x) {
+	return ((x << 56) & 0xff00000000000000ULL)
+			| ((x << 40) & 0x00ff000000000000ULL)
+			| ((x << 24) & 0x0000ff0000000000ULL)
+			| ((x << 8) & 0x000000ff00000000ULL)
+			| ((x >> 8) & 0x00000000ff000000ULL)
+			| ((x >> 24) & 0x0000000000ff0000ULL)
+			| ((x >> 40) & 0x000000000000ff00ULL)
+			| ((x >> 56) & 0x00000000000000ffULL);
+}
+
+FORCE_INLINE U64 XXH_readLE64_align(const void* ptr, XXH_endianess endian,
+		XXH_alignment align) {
+	if (align == XXH_unaligned)
+		return endian == XXH_littleEndian ?
+				XXH_read64(ptr) : XXH_swap64(XXH_read64(ptr));
+	else
+		return endian == XXH_littleEndian ?
+				*(const U64*) ptr : XXH_swap64(*(const U64*) ptr);
+}
+
+FORCE_INLINE U64 XXH_readLE64(const void* ptr, XXH_endianess endian) {
+	return XXH_readLE64_align(ptr, endian, XXH_unaligned);
+}
+
+FORCE_INLINE
+XXH_errorcode XXH64_update_endian(XXH64_state_t* state, const void* input,
+		size_t len, XXH_endianess endian) {
+	const BYTE* p = (const BYTE*) input;
+	const BYTE* const bEnd = p + len;
+
+	if (input == NULL)
+#if defined(XXH_ACCEPT_NULL_INPUT_POINTER) && (XXH_ACCEPT_NULL_INPUT_POINTER>=1)
+		return XXH_OK;
+#else
+		return XXH_ERROR;
+#endif
+
+	state->total_len += len;
+
+	if (state->memsize + len < 32) { /* fill in tmp buffer */
+		XXH_memcpy(((BYTE*) state->mem64) + state->memsize, input, len);
+		state->memsize += (U32) len;
+		return XXH_OK;
+	}
+
+	if (state->memsize) { /* tmp buffer is full */
+		XXH_memcpy(((BYTE*) state->mem64) + state->memsize, input,
+				32 - state->memsize);
+		state->v1 = XXH64_round(state->v1,
+				XXH_readLE64(state->mem64 + 0, endian));
+		state->v2 = XXH64_round(state->v2,
+				XXH_readLE64(state->mem64 + 1, endian));
+		state->v3 = XXH64_round(state->v3,
+				XXH_readLE64(state->mem64 + 2, endian));
+		state->v4 = XXH64_round(state->v4,
+				XXH_readLE64(state->mem64 + 3, endian));
+		p += 32 - state->memsize;
+		state->memsize = 0;
+	}
+
+	if (p + 32 <= bEnd) {
+		const BYTE* const limit = bEnd - 32;
+		U64 v1 = state->v1;
+		U64 v2 = state->v2;
+		U64 v3 = state->v3;
+		U64 v4 = state->v4;
+
+		do {
+			v1 = XXH64_round(v1, XXH_readLE64(p, endian));
+			p += 8;
+			v2 = XXH64_round(v2, XXH_readLE64(p, endian));
+			p += 8;
+			v3 = XXH64_round(v3, XXH_readLE64(p, endian));
+			p += 8;
+			v4 = XXH64_round(v4, XXH_readLE64(p, endian));
+			p += 8;
+		} while (p <= limit);
+
+		state->v1 = v1;
+		state->v2 = v2;
+		state->v3 = v3;
+		state->v4 = v4;
+	}
+
+	if (p < bEnd) {
+		XXH_memcpy(state->mem64, p, (size_t) (bEnd - p));
+		state->memsize = (unsigned) (bEnd - p);
+	}
+
+	return XXH_OK;
+}
+
+XXH_PUBLIC_API XXH_errorcode XXH64_update(XXH64_state_t* state_in,
+		const void* input, size_t len) {
+	XXH_endianess endian_detected = (XXH_endianess) XXH_CPU_LITTLE_ENDIAN;
+
+	if ((endian_detected == XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
+		return XXH64_update_endian(state_in, input, len, XXH_littleEndian);
+	else
+		return XXH64_update_endian(state_in, input, len, XXH_bigEndian);
+}
+
+static U64 XXH64_mergeRound(U64 acc, U64 val) {
+	val = XXH64_round(0, val);
+	acc ^= val;
+	acc = acc * PRIME64_1 + PRIME64_4;
+	return acc;
+}
+
+static U32 XXH_read32(const void* memPtr) {
+	U32 val;
+	memcpy(&val, memPtr, sizeof(val));
+	return val;
+}
+
+static U32 XXH_swap32(U32 x) {
+	return ((x << 24) & 0xff000000) | ((x << 8) & 0x00ff0000)
+			| ((x >> 8) & 0x0000ff00) | ((x >> 24) & 0x000000ff);
+}
+
+FORCE_INLINE U32 XXH_readLE32_align(const void* ptr, XXH_endianess endian,
+		XXH_alignment align) {
+	if (align == XXH_unaligned)
+		return endian == XXH_littleEndian ?
+				XXH_read32(ptr) : XXH_swap32(XXH_read32(ptr));
+	else
+		return endian == XXH_littleEndian ?
+				*(const U32*) ptr : XXH_swap32(*(const U32*) ptr);
+}
+
+#define XXH_get32bits(p) XXH_readLE32_align(p, endian, align)
+
+#define XXH_get64bits(p) XXH_readLE64_align(p, endian, align)
+
+static U64 XXH64_avalanche(U64 h64) {
+	h64 ^= h64 >> 33;
+	h64 *= PRIME64_2;
+	h64 ^= h64 >> 29;
+	h64 *= PRIME64_3;
+	h64 ^= h64 >> 32;
+	return h64;
+}
+
+static U64 XXH64_finalize(U64 h64, const void* ptr, size_t len,
+		XXH_endianess endian, XXH_alignment align) {
+	const BYTE* p = (const BYTE*) ptr;
+
+#define PROCESS1_64          \
+    h64 ^= (*p) * PRIME64_5; \
+    p++;                     \
+    h64 = XXH_rotl64(h64, 11) * PRIME64_1;
+
+#define PROCESS4_64          \
+    h64 ^= (U64)(XXH_get32bits(p)) * PRIME64_1; \
+    p+=4;                    \
+    h64 = XXH_rotl64(h64, 23) * PRIME64_2 + PRIME64_3;
+
+#define PROCESS8_64 {        \
+    U64 const k1 = XXH64_round(0, XXH_get64bits(p)); \
+    p+=8;                    \
+    h64 ^= k1;               \
+    h64  = XXH_rotl64(h64,27) * PRIME64_1 + PRIME64_4; \
+}
+
+	switch (len & 31) {
+	case 24:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 16:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 8:
+		PROCESS8_64
+		;
+		return XXH64_avalanche(h64);
+
+	case 28:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 20:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 12:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 4:
+		PROCESS4_64
+		;
+		return XXH64_avalanche(h64);
+
+	case 25:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 17:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 9:
+		PROCESS8_64
+		;
+		PROCESS1_64
+		;
+		return XXH64_avalanche(h64);
+
+	case 29:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 21:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 13:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 5:
+		PROCESS4_64
+		;
+		PROCESS1_64
+		;
+		return XXH64_avalanche(h64);
+
+	case 26:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 18:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 10:
+		PROCESS8_64
+		;
+		PROCESS1_64
+		;
+		PROCESS1_64
+		;
+		return XXH64_avalanche(h64);
+
+	case 30:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 22:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 14:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 6:
+		PROCESS4_64
+		;
+		PROCESS1_64
+		;
+		PROCESS1_64
+		;
+		return XXH64_avalanche(h64);
+
+	case 27:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 19:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 11:
+		PROCESS8_64
+		;
+		PROCESS1_64
+		;
+		PROCESS1_64
+		;
+		PROCESS1_64
+		;
+		return XXH64_avalanche(h64);
+
+	case 31:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 23:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 15:
+		PROCESS8_64
+		;
+		/* fallthrough */
+	case 7:
+		PROCESS4_64
+		;
+		/* fallthrough */
+	case 3:
+		PROCESS1_64
+		;
+		/* fallthrough */
+	case 2:
+		PROCESS1_64
+		;
+		/* fallthrough */
+	case 1:
+		PROCESS1_64
+		;
+		/* fallthrough */
+	case 0:
+		return XXH64_avalanche(h64);
+	}
+
+	/* impossible to reach */
+	assert(0);
+	return 0; /* unreachable, but some compilers complain without it */
+}
+
+FORCE_INLINE U64 XXH64_digest_endian(const XXH64_state_t* state,
+		XXH_endianess endian) {
+	U64 h64;
+
+	if (state->total_len >= 32) {
+		U64 const v1 = state->v1;
+		U64 const v2 = state->v2;
+		U64 const v3 = state->v3;
+		U64 const v4 = state->v4;
+
+		h64 =
+				XXH_rotl64(v1,
+						1) + XXH_rotl64(v2, 7) + XXH_rotl64(v3, 12) + XXH_rotl64(v4, 18);
+		h64 = XXH64_mergeRound(h64, v1);
+		h64 = XXH64_mergeRound(h64, v2);
+		h64 = XXH64_mergeRound(h64, v3);
+		h64 = XXH64_mergeRound(h64, v4);
+	} else {
+		h64 = state->v3 /*seed*/+ PRIME64_5;
+	}
+
+	h64 += (U64) state->total_len;
+
+	return XXH64_finalize(h64, state->mem64, (size_t) state->total_len, endian,
+			XXH_aligned);
+}
+
+XXH_PUBLIC_API unsigned long long XXH64_digest(const XXH64_state_t* state_in) {
+	XXH_endianess endian_detected = (XXH_endianess) XXH_CPU_LITTLE_ENDIAN;
+
+	if ((endian_detected == XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
+		return XXH64_digest_endian(state_in, XXH_littleEndian);
+	else
+		return XXH64_digest_endian(state_in, XXH_bigEndian);
+}
+
+#endif
+
 typedef natural hm_iter;
 #define HASH_MAP_VALOR_INVALIDO ((hm_iter)CACA_COMUN_VALOR_INVALIDO)
 typedef struct hash_map_entry {
