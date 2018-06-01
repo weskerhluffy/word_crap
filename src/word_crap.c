@@ -820,12 +820,93 @@ XXH_PUBLIC_API unsigned long long XXH64_digest(const XXH64_state_t* state_in) {
 		return XXH64_digest_endian(state_in, XXH_bigEndian);
 }
 
+FORCE_INLINE U64 XXH64_endian_align(const void* input, size_t len, U64 seed,
+		XXH_endianess endian, XXH_alignment align) {
+	const BYTE* p = (const BYTE*) input;
+	const BYTE* bEnd = p + len;
+	U64 h64;
+
+#if defined(XXH_ACCEPT_NULL_INPUT_POINTER) && (XXH_ACCEPT_NULL_INPUT_POINTER>=1)
+	if (p==NULL) {
+		len=0;
+		bEnd=p=(const BYTE*)(size_t)32;
+	}
+#endif
+
+	if (len >= 32) {
+		const BYTE* const limit = bEnd - 32;
+		U64 v1 = seed + PRIME64_1 + PRIME64_2;
+		U64 v2 = seed + PRIME64_2;
+		U64 v3 = seed + 0;
+		U64 v4 = seed - PRIME64_1;
+
+		do {
+			v1 = XXH64_round(v1, XXH_get64bits(p));
+			p += 8;
+			v2 = XXH64_round(v2, XXH_get64bits(p));
+			p += 8;
+			v3 = XXH64_round(v3, XXH_get64bits(p));
+			p += 8;
+			v4 = XXH64_round(v4, XXH_get64bits(p));
+			p += 8;
+		} while (p <= limit);
+
+		h64 =
+				XXH_rotl64(v1,
+						1) + XXH_rotl64(v2, 7) + XXH_rotl64(v3, 12) + XXH_rotl64(v4, 18);
+		h64 = XXH64_mergeRound(h64, v1);
+		h64 = XXH64_mergeRound(h64, v2);
+		h64 = XXH64_mergeRound(h64, v3);
+		h64 = XXH64_mergeRound(h64, v4);
+
+	} else {
+		h64 = seed + PRIME64_5;
+	}
+
+	h64 += (U64) len;
+
+	return XXH64_finalize(h64, p, len, endian, align);
+}
+
+#define XXH_FORCE_ALIGN_CHECK 0
+XXH_PUBLIC_API unsigned long long XXH64(const void* input, size_t len,
+		unsigned long long seed) {
+#if 0
+	/* Simple version, good for code maintenance, but unfortunately slow for small inputs */
+	XXH64_state_t state;
+	XXH64_reset(&state, seed);
+	XXH64_update(&state, input, len);
+	return XXH64_digest(&state);
+#else
+	XXH_endianess endian_detected = (XXH_endianess) XXH_CPU_LITTLE_ENDIAN;
+
+	if (XXH_FORCE_ALIGN_CHECK) {
+		if ((((size_t) input) & 7) == 0) { /* Input is aligned, let's leverage the speed advantage */
+			if ((endian_detected == XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
+				return XXH64_endian_align(input, len, seed, XXH_littleEndian,
+						XXH_aligned);
+			else
+				return XXH64_endian_align(input, len, seed, XXH_bigEndian,
+						XXH_aligned);
+		}
+	}
+
+	if ((endian_detected == XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
+		return XXH64_endian_align(input, len, seed, XXH_littleEndian,
+				XXH_unaligned);
+	else
+		return XXH64_endian_align(input, len, seed, XXH_bigEndian,
+				XXH_unaligned);
+#endif
+}
+
 #endif
 
 typedef natural hm_iter;
 #define HASH_MAP_VALOR_INVALIDO ((hm_iter)CACA_COMUN_VALOR_INVALIDO)
 typedef struct hash_map_entry {
-	entero_largo llave;
+	const void *llave;
+	natural llave_tam;
 	entero_largo valor;
 } hm_entry;
 typedef struct hash_map_cubeta {
@@ -839,6 +920,15 @@ typedef struct hash_map_robin_hood_back_shift {
 	uint64_t probing_min_;
 	uint64_t probing_max_;
 } hm_rr_bs_tabla;
+
+static inline entero_largo_sin_signo hash_map_robin_hood_hashear(
+		hm_rr_bs_tabla *ht, byteme *mierda, natural mierda_tam) {
+	entero_largo_sin_signo ass = 0;
+
+	ass = XXH64(mierda, mierda_tam, ass) % ht->num_buckets_;
+	return ass;
+}
+
 int hash_map_robin_hood_back_shift_init(hm_rr_bs_tabla *ht, int num_cubetas) {
 	ht->num_buckets_ = num_cubetas;
 	ht->buckets_ = (hm_cubeta *) calloc(ht->num_buckets_, sizeof(hm_cubeta));
@@ -874,11 +964,10 @@ static inline int hash_map_robin_hood_back_shift_llena_distancia_a_indice_inicio
 	return 0;
 }
 hm_iter hash_map_robin_hood_back_shift_obten(hm_rr_bs_tabla *ht,
-		const entero_largo key, entero_largo *value) {
+		const void *key, natural key_len, entero_largo *value) {
 	uint64_t num_cubetas = ht->num_buckets_;
 	uint64_t prob_max = ht->probing_max_;
-//	uint64_t hash = hash_function_caca(key);
-	uint64_t hash = key % num_cubetas;
+	uint64_t hash = hash_map_robin_hood_hashear(ht, (void *) key, key_len);
 	uint64_t index_init = hash;
 	uint64_t probe_distance = 0;
 	uint64_t index_current;
@@ -896,7 +985,7 @@ hm_iter hash_map_robin_hood_back_shift_obten(hm_rr_bs_tabla *ht,
 		if (i > probe_distance) {
 			break;
 		}
-		if (entrada->llave == key) {
+		if (!memcmp(entrada->llave, key, entrada->llave_tam)) {
 			*value = entrada->valor;
 			found = verdadero;
 			break;
@@ -906,8 +995,8 @@ hm_iter hash_map_robin_hood_back_shift_obten(hm_rr_bs_tabla *ht,
 		return index_current;
 	return HASH_MAP_VALOR_INVALIDO;
 }
-hm_iter hash_map_robin_hood_back_shift_pon(hm_rr_bs_tabla *ht, entero_largo key,
-		entero_largo value, bool *nuevo_entry) {
+hm_iter hash_map_robin_hood_back_shift_pon(hm_rr_bs_tabla *ht, const void *key,
+		natural key_len, entero_largo value, bool *nuevo_entry) {
 	uint64_t num_cubetas = ht->num_buckets_;
 	uint64_t prob_max = ht->probing_max_;
 	uint64_t prob_min = ht->probing_min_;
@@ -918,11 +1007,11 @@ hm_iter hash_map_robin_hood_back_shift_pon(hm_rr_bs_tabla *ht, entero_largo key,
 		return HASH_MAP_VALOR_INVALIDO;
 	}
 	ht->num_buckets_used_ += 1;
-//	uint64_t hash = hash_function_caca(key);
-	uint64_t hash = key % num_cubetas;
+	uint64_t hash = hash_map_robin_hood_hashear(ht, (void *) key, key_len);
 	uint64_t index_init = hash;
 	hm_entry *entry = (hm_entry *) calloc(1, sizeof(hm_entry));
 	entry->llave = key;
+	entry->llave_tam = key_len;
 	entry->valor = value;
 	uint64_t index_current = index_init % num_cubetas;
 	uint64_t probe_current = 0;
@@ -944,7 +1033,7 @@ hm_iter hash_map_robin_hood_back_shift_pon(hm_rr_bs_tabla *ht, entero_largo key,
 			}
 			break;
 		} else {
-			if (cubeta->entry->llave == key) {
+			if (!memcmp(cubeta->entry->llave, key, cubeta->entry->llave_tam)) {
 				free(entry);
 				*nuevo_entry = falso;
 				break;
@@ -966,12 +1055,12 @@ hm_iter hash_map_robin_hood_back_shift_pon(hm_rr_bs_tabla *ht, entero_largo key,
 	}
 	return index_current;
 }
-int hash_map_robin_hood_back_shift_borra(hm_rr_bs_tabla *ht,
-		const tipo_dato key) {
+int hash_map_robin_hood_back_shift_borra(hm_rr_bs_tabla *ht, const void *key,
+		natural key_len) {
 	uint64_t num_cubetas = ht->num_buckets_;
 	uint64_t prob_max = ht->probing_max_;
 	uint64_t prob_min = ht->probing_max_;
-	uint64_t hash = key % num_cubetas;
+	uint64_t hash = hash_map_robin_hood_hashear(ht, (void *) key, key_len);
 	uint64_t index_init = hash;
 	bool found = falso;
 	uint64_t index_current = 0;
@@ -985,7 +1074,7 @@ int hash_map_robin_hood_back_shift_borra(hm_rr_bs_tabla *ht,
 		if (entrada == NULL || i > probe_distance) {
 			break;
 		}
-		if (entrada->llave == key) {
+		if (!memcmp(entrada->llave, key, entrada->llave_tam)) {
 			found = verdadero;
 			break;
 		}
@@ -1064,7 +1153,7 @@ static inline bool hash_map_robin_hood_back_shift_indice_existe(
 		hm_rr_bs_tabla *ht, hm_iter indice) {
 	return !!ht->buckets_[indice].entry;
 }
-static inline entero_largo hash_map_robin_hood_back_shift_indice_obten_llave(
+static inline const void *hash_map_robin_hood_back_shift_indice_obten_llave(
 		hm_rr_bs_tabla *ht, hm_iter indice) {
 	assert_timeout(indice <= ht->probing_max_ && indice >= ht->probing_min_);
 	hm_entry *entrada = ht->buckets_[indice].entry;
