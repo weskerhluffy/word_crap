@@ -1250,7 +1250,7 @@ static inline void hash_map_robin_hood_back_shift_reemplazar(hm_rr_bs_tabla *ht,
 	hm_iter iter = 0;
 	entero_largo *valor_int = &(entero_largo ) { 0 };
 
-	iter = hash_map_robin_hood_back_shift_obten(ht, &llave, llave_tam,
+	iter = hash_map_robin_hood_back_shift_obten(ht, llave, llave_tam,
 			valor_int);
 
 	assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
@@ -1259,10 +1259,11 @@ static inline void hash_map_robin_hood_back_shift_reemplazar(hm_rr_bs_tabla *ht,
 }
 
 static inline void hash_map_robin_hood_back_shift_insertar_nuevo(
-		hm_rr_bs_tabla *ht, entero_largo llave, entero_largo valor) {
+		hm_rr_bs_tabla *ht, void *llave, natural llave_tam, entero_largo valor) {
 	hm_iter iter = 0;
 	bool nuevo = falso;
-	iter = hash_map_robin_hood_back_shift_pon(ht, &llave, 8, valor, &nuevo);
+	iter = hash_map_robin_hood_back_shift_pon(ht, llave, llave_tam, valor,
+			&nuevo);
 
 	assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
 	assert_timeout(nuevo);
@@ -1280,10 +1281,15 @@ static inline void hash_map_robin_hood_back_shift_insertar_nuevo(
 typedef struct heap_shit_nodo {
 	void *valor;
 } heap_shit_nodo;
+typedef struct heap_shit_nodo_llave {
+	void *contenido;
+	natural contenido_tam;
+} heap_shit_nodo_llave;
 typedef struct heap_shit heap_shit;
 
 typedef int (*heap_shit_compara_prioridad)(void *a, void *b);
-typedef entero_largo (*heap_shit_obten_llave)(void *valor);
+typedef heap_shit_nodo_llave *(*heap_shit_obten_llave)(void *valor,
+		heap_shit_nodo_llave *llave_res);
 
 struct heap_shit {
 	bool min;
@@ -1335,7 +1341,7 @@ static inline void heap_shit_push_up(heap_shit *heap_ctx, natural idx) {
 	heap_shit_nodo *heap = heap_ctx->heap;
 	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
 	heap_shit_nodo nodo;
-	entero_largo llave = 0;
+	heap_shit_nodo_llave *llave = (heap_shit_nodo_llave* ) { 0 };
 
 	assert_timeout(idx);
 	assert_timeout(idx <= heap_size);
@@ -1352,18 +1358,23 @@ static inline void heap_shit_push_up(heap_shit *heap_ctx, natural idx) {
 									heap[idx].valor) > 0))) {
 
 		natural idx_padre = heap_shit_idx_padre(idx);
-		entero_largo llave_padre = heap_ctx->obten_llave_fn(
-				heap[idx_padre].valor);
-		assert_timeout(llave_padre!= HEAP_SHIT_VALOR_INVALIDO);
+		memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+		llave = heap_ctx->obten_llave_fn(heap[idx_padre].valor, llave);
+		assert_timeout(
+				(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
 
-		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, &llave_padre, 8,
-				idx);
+		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
+				llave->contenido_tam, idx);
 		heap[idx] = heap[idx_padre];
 		idx = idx_padre;
 	}
 
-	llave = heap_ctx->obten_llave_fn(nodo.valor);
-	hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, &llave, 8, idx);
+	memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+	llave = heap_ctx->obten_llave_fn(nodo.valor, llave);
+	assert_timeout(
+			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+	hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
+			llave->contenido_tam, idx);
 	heap[idx] = nodo;
 
 }
@@ -1373,7 +1384,7 @@ static inline void heap_shit_push_down(heap_shit *heap_ctx, natural idx) {
 	heap_shit_nodo *heap = heap_ctx->heap;
 	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
 	heap_shit_nodo nodo = { 0 };
-	entero_largo llave = 0;
+	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
 
 	assert_timeout(idx);
 	assert_timeout(idx <= heap_size);
@@ -1410,15 +1421,22 @@ static inline void heap_shit_push_down(heap_shit *heap_ctx, natural idx) {
 			break;
 		}
 
-		entero_largo llave_hijo = heap_ctx->obten_llave_fn(nodo_sig->valor);
-		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, &llave_hijo, 8,
-				idx);
+		memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+		llave = heap_ctx->obten_llave_fn(nodo_sig->valor, llave);
+		assert_timeout(
+				(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
+				llave->contenido_tam, idx);
 		heap[idx] = heap[idx_hijo];
 		idx = idx_hijo;
 	}
 
-	llave = heap_ctx->obten_llave_fn(nodo.valor);
-	hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, &llave, 8, idx);
+	memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+	llave = heap_ctx->obten_llave_fn(nodo.valor, llave);
+	assert_timeout(
+			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+	hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
+			llave->contenido_tam, idx);
 	heap[idx] = nodo;
 
 }
@@ -1429,11 +1447,16 @@ static inline void heap_shit_insert(heap_shit *heap_ctx,
 	natural heap_size = ++heap_ctx->heap_size;
 	heap_shit_nodo *heap = heap_ctx->heap;
 	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
+	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
 
 	assert_timeout(heap_size<HEAP_SHIT_MAX_NODOS);
 
-	hash_map_robin_hood_back_shift_insertar_nuevo(mapeo_inv,
-			heap_ctx->obten_llave_fn(nodo_nuevo->valor), heap_size);
+	memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+	llave = heap_ctx->obten_llave_fn(nodo_nuevo->valor, llave);
+	assert_timeout(
+			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+	hash_map_robin_hood_back_shift_insertar_nuevo(mapeo_inv, llave->contenido,
+			llave->contenido_tam, heap_size);
 	heap[heap_size] = *nodo_nuevo; /*Insert in the last place*/
 
 	heap_shit_push_up(heap_ctx, heap_size);
@@ -1448,21 +1471,29 @@ static inline void *heap_shit_delete(heap_shit *heap_ctx, natural idx) {
 	heap_shit_nodo nodo = { 0 };
 	heap_shit_nodo *heap = heap_ctx->heap;
 	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
-	entero_largo llave = 0;
+	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
 	void *resultado;
 
 	assert_timeout(heap_size >= idx);
 	assert_timeout(idx);
 
-	llave = heap_ctx->obten_llave_fn(heap[idx].valor);
+	memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+	llave = heap_ctx->obten_llave_fn(heap[idx].valor, llave);
+	assert_timeout(
+			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
 
 	resultado = heap[idx].valor;
-	hash_map_robin_hood_back_shift_borra(mapeo_inv, &llave, 8);
+	hash_map_robin_hood_back_shift_borra(mapeo_inv, llave->contenido,
+			llave->contenido_tam);
 
 	if (idx != idx_last) {
 		assert_timeout(idx < idx_last);
-		llave = heap_ctx->obten_llave_fn(heap[idx_last].valor);
-		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, &llave, 8, idx);
+		memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+		llave = heap_ctx->obten_llave_fn(heap[idx_last].valor, llave);
+		assert_timeout(
+				(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
+				llave->contenido_tam, idx);
 		heap[idx] = heap[idx_last];
 		heap_shit_push_down(heap_ctx, idx);
 	}
@@ -1472,8 +1503,8 @@ static inline void *heap_shit_delete(heap_shit *heap_ctx, natural idx) {
 	return resultado;
 }
 
-static inline void *heap_shit_borrar_directo(heap_shit *heap_ctx,
-		tipo_dato llave) {
+static inline void *heap_shit_borrar_directo(heap_shit *heap_ctx, void *llave,
+		natural llave_tam) {
 	natural heap_size = heap_ctx->heap_size;
 	hm_rr_bs_tabla *indices_valores = heap_ctx->tablon_llave_a_idx_heap;
 	entero_largo idx_a_borrar;
@@ -1481,7 +1512,7 @@ static inline void *heap_shit_borrar_directo(heap_shit *heap_ctx,
 	assert_timeout(heap_size);
 
 	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
-			&llave, 8, &idx_a_borrar);
+			llave, llave_tam, &idx_a_borrar);
 	assert_timeout(idx_a_borrar <= heap_size);
 	caca_log_debug("borrando llave %d en idx %u en idx hm %u con heap size %u",
 			llave, idx_a_borrar, idx_hm, heap_size);
@@ -1492,9 +1523,15 @@ static inline void *heap_shit_borrar_directo(heap_shit *heap_ctx,
 }
 
 static inline void *heap_shit_borra_torpe(heap_shit *heap_ctx) {
+	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
+
+	memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+	llave = heap_ctx->obten_llave_fn(heap_ctx->heap[1].valor, llave);
+	assert_timeout(
+			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
 	if (heap_ctx->heap_size) {
-		return heap_shit_borrar_directo(heap_ctx,
-				heap_ctx->obten_llave_fn(heap_ctx->heap[1].valor));
+		return heap_shit_borrar_directo(heap_ctx, llave->contenido,
+				llave->contenido_tam);
 	} else {
 		assert_timeout(!heap_ctx->heap[0].valor);
 		return NULL;
@@ -1503,13 +1540,15 @@ static inline void *heap_shit_borra_torpe(heap_shit *heap_ctx) {
 
 static inline void heap_shit_actualiza(heap_shit *ctx, void *valor) {
 	hm_rr_bs_tabla *indices_valores = ctx->tablon_llave_a_idx_heap;
-	entero_largo llave = ctx->obten_llave_fn(valor);
+	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
 	heap_shit_nodo *heap = ctx->heap;
 	entero_largo idx = 0;
 	entero_largo idx_hi = 0;
 	entero_largo idx_hd = 0;
 	entero_largo idx_p = 0;
 	heap_shit_nodo *nodo = NULL;
+
+	llave = ctx->obten_llave_fn(valor, llave);
 
 	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
 			&llave, 8, &idx);
