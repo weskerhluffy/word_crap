@@ -1291,6 +1291,7 @@ typedef int (*heap_shit_compara_prioridad)(void *a, void *b);
 typedef heap_shit_nodo_llave *(*heap_shit_obten_llave)(void *valor,
 		heap_shit_nodo_llave *llave_res);
 typedef void *(*heap_shit_obten_prioridad)(void *valor);
+typedef char *(*heap_shit_elemento_a_cadena)(void *valor, char *buffer);
 
 struct heap_shit {
 	bool min;
@@ -1300,13 +1301,15 @@ struct heap_shit {
 	heap_shit_compara_prioridad compara_prioridad_fn;
 	heap_shit_obten_llave obten_llave_fn;
 	heap_shit_obten_prioridad obten_prioridad_fn;
+	heap_shit_elemento_a_cadena elem_a_cad_fn;
 };
 
 /*Initialize Heap*/
 static inline heap_shit *heap_shit_init(bool es_min,
 		heap_shit_compara_prioridad compara_prioridad_fn,
 		heap_shit_obten_llave obten_llave_fn,
-		heap_shit_obten_prioridad obten_prioridad_fn) {
+		heap_shit_obten_prioridad obten_prioridad_fn,
+		heap_shit_elemento_a_cadena elem_a_cad_fn) {
 	heap_shit *heap = calloc(1, sizeof(heap_shit));
 	assert_timeout(heap);
 	heap->heap_size = 0;
@@ -1319,6 +1322,7 @@ static inline heap_shit *heap_shit_init(bool es_min,
 	assert_timeout(heap->tablon_llave_a_idx_heap);
 	hash_map_robin_hood_back_shift_init(heap->tablon_llave_a_idx_heap,
 	HEAP_SHIT_MAX_NODOS);
+	heap->elem_a_cad_fn = elem_a_cad_fn;
 	return heap;
 }
 
@@ -1463,6 +1467,9 @@ static inline void heap_shit_insert(heap_shit *heap_ctx,
 			llave->contenido_tam, heap_size);
 	heap[heap_size] = *nodo_nuevo; /*Insert in the last place*/
 
+	caca_log_debug("insertado inicialmene %s en %u",
+			heap_ctx->elem_a_cad_fn(heap[heap_size].valor,CACA_COMUN_BUF_STATICO),
+			heap_size);
 	heap_shit_push_up(heap_ctx, heap_size);
 }
 
@@ -1547,8 +1554,6 @@ static inline void heap_shit_actualiza(heap_shit *ctx, void *valor) {
 	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
 	heap_shit_nodo *heap = ctx->heap;
 	entero_largo idx = 0;
-	entero_largo idx_hi = 0;
-	entero_largo idx_hd = 0;
 	entero_largo idx_p = 0;
 	heap_shit_nodo *nodo = NULL;
 
@@ -1559,18 +1564,26 @@ static inline void heap_shit_actualiza(heap_shit *ctx, void *valor) {
 	assert_timeout(idx_hm!=HASH_MAP_VALOR_INVALIDO);
 	nodo = heap + idx;
 	idx_p = heap_shit_idx_padre(idx);
-	idx_hi = heap_shit_idx_hijo_izq(idx);
-	idx_hd = heap_shit_idx_hijo_der(idx);
 
+	caca_log_debug("actualizando %s",
+			ctx->elem_a_cad_fn(nodo->valor,CACA_COMUN_BUF_STATICO));
+
+	caca_log_debug("%s i su padre %s",
+			ctx->elem_a_cad_fn(nodo->valor,CACA_COMUN_BUF_STATICO),
+			idx_p?ctx->elem_a_cad_fn(heap[idx_p].valor,CACA_COMUN_BUF_STATICO):"NADA");
 	if (idx_p
 			&& ((ctx->min
 					&& ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor)
 							< 1)
 					|| (!ctx->min
 							&& ctx->compara_prioridad_fn(nodo->valor,
-									heap[idx].valor) > 1))) {
+									heap[idx_p].valor) > 0))) {
+		caca_log_debug("empujando arriba %hu %d", ctx->min,
+				ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor));
 		heap_shit_push_up(ctx, idx);
 	} else {
+		caca_log_debug("empujando abajo %hu %d", ctx->min,
+				idx_p?ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor):0);
 		heap_shit_push_down(ctx, idx);
 	}
 }
@@ -1819,6 +1832,7 @@ typedef cola_conteo_llave *(*cola_conteo_obten_llave_fn)(void *elemento,
 		cola_conteo_llave *llave_mem);
 
 typedef int (*cola_conteo_comparar_elementos_fn)(void *a, void *b);
+typedef char *(*cola_conteo_elemento_a_cadena_fn)(void *elemento, char *buffer);
 
 typedef struct cola_conteo {
 	listilla_fifo *elementos;
@@ -1827,6 +1841,7 @@ typedef struct cola_conteo {
 	natural elementos_cnt;
 	cola_conteo_obten_llave_fn obten_llave_fn;
 	cola_conteo_comparar_elementos_fn comp_elems_fn;
+	cola_conteo_elemento_a_cadena_fn elem_a_cad_fn;
 } cola_conteo;
 
 typedef struct cola_conteo_elem {
@@ -1850,8 +1865,12 @@ static inline int cola_conteo_compara_elementos_conteo(void *pa, void *pb) {
 	res = a->conteo - b->conteo;
 
 	if (!res) {
-		res = cola->comp_elems_fn(pa, pb);
+		res = cola->comp_elems_fn(a->elemento, b->elemento);
 	}
+	caca_log_debug("comp %s:%u con %s:%u r %d",
+			cola->elem_a_cad_fn(a->elemento,CACA_COMUN_BUF_STATICO), a->conteo,
+			cola->elem_a_cad_fn(b->elemento,CACA_COMUN_BUF_STATICO), b->conteo,
+			res)
 
 	return res;
 }
@@ -1877,18 +1896,32 @@ static inline void *cola_conteo_obten_conteo(void *elemento) {
 	return elemento;
 }
 
+static inline char *cola_conteo_elemento_a_cadena(void *elemento, char *buffer) {
+	cola_conteo_elem *e = elemento;
+	cola_conteo *cola = e->cola;
+
+	sprintf(buffer, "elem %s tiene cnt %u",
+			cola->elem_a_cad_fn(e->elemento, CACA_COMUN_BUF_STATICO),
+			e->conteo);
+
+	return buffer;
+}
+
 static inline cola_conteo *cola_conteo_init(natural limite,
 		cola_conteo_obten_llave_fn obten_llave_fn,
-		cola_conteo_comparar_elementos_fn comp_elem_fn) {
+		cola_conteo_comparar_elementos_fn comp_elem_fn,
+		cola_conteo_elemento_a_cadena_fn elem_a_cad_fn) {
 	cola_conteo *cola = calloc(1, sizeof(cola_conteo));
 	assert_timeout(cola);
 	cola->elementos = list_new();
 	cola->monton_conteo_elementos = heap_shit_init(falso,
 			cola_conteo_compara_elementos_conteo,
-			cola_conteo_obten_llave_elemento, cola_conteo_obten_conteo);
+			cola_conteo_obten_llave_elemento, cola_conteo_obten_conteo,
+			cola_conteo_elemento_a_cadena);
 	cola->limite = limite;
 	cola->obten_llave_fn = obten_llave_fn;
 	cola->comp_elems_fn = comp_elem_fn;
+	cola->elem_a_cad_fn = elem_a_cad_fn;
 	return cola;
 }
 
@@ -1911,6 +1944,9 @@ static inline void cola_conteo_anade_elemento(cola_conteo *cola, void *elemento)
 				llave->contenido, llave->contenido_tam);
 		assert_timeout(conteo_act);
 		assert_timeout(conteo_act->conteo);
+
+		caca_log_debug("antes de dec %s es %u", (conteo_act->elemento),
+				conteo_act->conteo);
 		conteo_act->conteo--;
 
 		heap_shit_actualiza(cola->monton_conteo_elementos, conteo_act);
@@ -1924,6 +1960,8 @@ static inline void cola_conteo_anade_elemento(cola_conteo *cola, void *elemento)
 	llave = cola->obten_llave_fn(elemento, llave);
 	if ((conteo_act = heap_shit_contiene_elemento(cola->monton_conteo_elementos,
 			llave->contenido, llave->contenido_tam))) {
+		caca_log_debug("antes de inc %s tiene %u", (conteo_act->elemento),
+				conteo_act->conteo);
 		conteo_act->conteo++;
 		heap_shit_actualiza(cola->monton_conteo_elementos, conteo_act);
 		caca_log_debug("incrementado %s aora %u", (conteo_act->elemento),
@@ -1968,9 +2006,17 @@ cola_conteo_llave *word_crap_obten_llave(void *elemento,
 int word_crap_compara_palabras(void *pa, void *pb) {
 	palabra *a = pa;
 	palabra *b = pb;
-
-	return strncmp(b->cadena, a->cadena,
+	int r = strncmp(b->cadena, a->cadena,
 			caca_comun_min(a->cadena_tam, b->cadena_tam));
+
+	caca_log_debug("comparando %s con %s r %d", a->cadena, b->cadena, r);
+	return r;
+}
+
+static inline char *palabra_a_cadena(void *elemento, char *buffer) {
+	palabra *p = elemento;
+	sprintf(buffer, "%s:%u", p->cadena, p->cadena_tam);
+	return buffer;
 }
 
 static inline void word_crap_main() {
@@ -1983,11 +2029,12 @@ static inline void word_crap_main() {
 
 		palabras_cnt = 0;
 
+		printf("Case %u:\n", i + 1);
 		scanf("%u %u\n", &n, &k);
 		caca_log_debug("mierda %u %u", n, k);
 
 		cola_conteo *caca = cola_conteo_init(k, word_crap_obten_llave,
-				word_crap_compara_palabras);
+				word_crap_compara_palabras, palabra_a_cadena);
 
 		for (int j = 0; j < n; j++) {
 			palabra *p = don_palabras + palabras_cnt++;
