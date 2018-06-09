@@ -1350,6 +1350,7 @@ static inline void heap_shit_push_up(heap_shit *heap_ctx, natural idx) {
 	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
 	heap_shit_nodo nodo;
 	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
+	natural idx_padre = 0;
 
 	assert_timeout(idx);
 	assert_timeout(idx <= heap_size);
@@ -1357,15 +1358,14 @@ static inline void heap_shit_push_up(heap_shit *heap_ctx, natural idx) {
 
 	nodo = heap[idx];
 
-	while (heap_shit_idx_padre(idx)
+	while ((idx_padre = heap_shit_idx_padre(idx))
 			&& ((heap_ctx->min
 					&& heap_ctx->compara_prioridad_fn(nodo.valor,
-							heap[idx].valor) < 0)
+							heap[idx_padre].valor) < 0)
 					|| (!heap_ctx->min
 							&& heap_ctx->compara_prioridad_fn(nodo.valor,
-									heap[idx].valor) > 0))) {
+									heap[idx_padre].valor) > 0))) {
 
-		natural idx_padre = heap_shit_idx_padre(idx);
 		memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
 		llave = heap_ctx->obten_llave_fn(heap[idx_padre].valor, llave);
 		assert_timeout(
