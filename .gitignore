@@ -1,3 +1,6 @@
 
 *.out
 *.plist
+src/word_crap.dSYM/Contents/Resources/DWARF/word_crap
+src/word_crap
+src/shit
