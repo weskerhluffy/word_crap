@@ -1666,6 +1666,10 @@ int word_crap_compara_palabras(void *pa, void *pb) {
 	int r = strncmp(b->cadena, a->cadena,
 			caca_comun_min(a->cadena_tam, b->cadena_tam));
 
+	if (!r) {
+		r = b->cadena_tam - a->cadena_tam;
+	}
+
 	caca_log_debug("comparando %s con %s r %d", a->cadena, b->cadena, r);
 	return r;
 }

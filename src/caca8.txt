@@ -1,0 +1,12 @@
+1
+10 3
+caca
+mierda
+caca
+caca
+mierda
+caca
+mierda
+mierda
+caca
+caca
