@@ -1578,6 +1578,7 @@ static inline cola_conteo *cola_conteo_init(natural limite,
 	cola->obten_llave_fn = obten_llave_fn;
 	cola->comp_elems_fn = comp_elem_fn;
 	cola->elem_a_cad_fn = elem_a_cad_fn;
+	conteo_elemns_cnt = 0;
 	return cola;
 }
 
@@ -1637,7 +1638,7 @@ static inline void cola_conteo_anade_elemento(cola_conteo *cola, void *elemento)
 static inline void *cola_conteo_torpe(cola_conteo *cola) {
 	cola_conteo_elem *torpe = NULL;
 	torpe = heap_shit_consulta_torpe(cola->monton_conteo_elementos);
-	return torpe->elemento;
+	return torpe;
 }
 
 #define WORD_CRAP_MAX_TAM_CAD 9
@@ -1699,6 +1700,7 @@ static inline void word_crap_main() {
 		for (int j = 0; j < n; j++) {
 			palabra *p = don_palabras + palabras_cnt++;
 			palabra *r = NULL;
+			cola_conteo_elem *cc = NULL;
 			memset(p, '\0', sizeof(palabra));
 			if (scanf("%s\n", p->cadena) < 1) {
 				continue;
@@ -1710,10 +1712,13 @@ static inline void word_crap_main() {
 			caca_log_debug("cacadena %s", p->cadena);
 			cola_conteo_anade_elemento(caca, p);
 
-			r = cola_conteo_torpe(caca);
+			cc = cola_conteo_torpe(caca);
+			assert_timeout(cc);
+			r = cc->elemento;
 			assert_timeout(r);
 
-			printf("%s\n", r->cadena);
+			printf("%s %u\n", r->cadena, cc->conteo);
+			setbuf(stdout, NULL);
 		}
 
 		cola_conteo_fini(caca);
