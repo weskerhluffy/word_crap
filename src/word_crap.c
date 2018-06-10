@@ -10,9 +10,6 @@
 
 // XXX: http://www.spoj.com/problems/WORDCNT2/
 // XXX: http://codeforces.com/blog/entry/48915
-#include <stdio.h>
-#include <stdlib.h>
-
 #if 1
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -56,6 +53,7 @@
 
 #define CACA_COMUN_VALOR_INVALIDO ((tipo_dato)UINT_MAX)
 #define CACA_COMUN_IDX_INVALIDO ((natural)CACA_COMUN_VALOR_INVALIDO)
+//#define CACA_COMUN_LOG
 
 typedef unsigned int natural;
 typedef natural tipo_dato;
@@ -68,11 +66,11 @@ typedef enum BOOLEANOS {
 	falso = 0, verdadero
 } bool;
 
+#define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_SUAVECITO
 /*
- #define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_SUAVECITO
  #define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_NIMADRES
+ #define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_DUROTE
  */
-#define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_DUROTE
 
 #define assert_timeout_dummy(condition) 0;
 
@@ -238,8 +236,9 @@ char *caca_comun_matrix_a_cadena(tipo_dato *matrix, natural filas_tam,
 	return buffer;
 }
 
-static char *caca_comun_arreglo_a_cadena_entero_largo_sin_signo(entero_largo_sin_signo *arreglo,
-		entero_largo_sin_signo tam_arreglo, char *buffer) {
+static char *caca_comun_arreglo_a_cadena_entero_largo_sin_signo(
+		entero_largo_sin_signo *arreglo, entero_largo_sin_signo tam_arreglo,
+		char *buffer) {
 	int i;
 	char *ap_buffer = NULL;
 	int characteres_escritos = 0;
@@ -251,8 +250,8 @@ static char *caca_comun_arreglo_a_cadena_entero_largo_sin_signo(entero_largo_sin
 	ap_buffer = buffer;
 
 	for (i = 0; i < tam_arreglo; i++) {
-		characteres_escritos += sprintf(ap_buffer + characteres_escritos, "%2llu",
-				*(arreglo + i));
+		characteres_escritos += sprintf(ap_buffer + characteres_escritos,
+				"%2llu", *(arreglo + i));
 		if (i < tam_arreglo - 1) {
 			*(ap_buffer + characteres_escritos++) = ',';
 		}
@@ -410,17 +409,6 @@ typedef enum {
 	XXH_aligned, XXH_unaligned
 } XXH_alignment;
 
-static void* XXH_malloc(size_t s) {
-	return malloc(s);
-}
-static void XXH_free(void* p) {
-	free(p);
-}
-/*! and for memcpy() */
-static void* XXH_memcpy(void* dest, const void* src, size_t size) {
-	return memcpy(dest, src, size);
-}
-
 static int XXH_isLittleEndian(void) {
 	const union {
 		U32 u;
@@ -429,23 +417,6 @@ static int XXH_isLittleEndian(void) {
 	return one.c[0];
 }
 #define XXH_CPU_LITTLE_ENDIAN   XXH_isLittleEndian()
-
-XXH_PUBLIC_API XXH64_state_t* XXH64_createState(void) {
-	return (XXH64_state_t*) XXH_malloc(sizeof(XXH64_state_t));
-}
-
-XXH_PUBLIC_API XXH_errorcode XXH64_reset(XXH64_state_t* statePtr,
-		unsigned long long seed) {
-	XXH64_state_t state; /* using a local state to memcpy() in order to avoid strict-aliasing warnings */
-	memset(&state, 0, sizeof(state));
-	state.v1 = seed + PRIME64_1 + PRIME64_2;
-	state.v2 = seed + PRIME64_2;
-	state.v3 = seed + 0;
-	state.v4 = seed - PRIME64_1;
-	/* do not write into reserved, planned to be removed in a future version */
-	memcpy(statePtr, &state, sizeof(state) - sizeof(state.reserved));
-	return XXH_OK;
-}
 
 static U64 XXH64_round(U64 acc, U64 input) {
 	acc += input * PRIME64_2;
@@ -479,88 +450,6 @@ FORCE_INLINE U64 XXH_readLE64_align(const void* ptr, XXH_endianess endian,
 	else
 		return endian == XXH_littleEndian ?
 				*(const U64*) ptr : XXH_swap64(*(const U64*) ptr);
-}
-
-FORCE_INLINE U64 XXH_readLE64(const void* ptr, XXH_endianess endian) {
-	return XXH_readLE64_align(ptr, endian, XXH_unaligned);
-}
-
-FORCE_INLINE
-XXH_errorcode XXH64_update_endian(XXH64_state_t* state, const void* input,
-		size_t len, XXH_endianess endian) {
-	const BYTE* p = (const BYTE*) input;
-	const BYTE* const bEnd = p + len;
-
-	if (input == NULL)
-#if defined(XXH_ACCEPT_NULL_INPUT_POINTER) && (XXH_ACCEPT_NULL_INPUT_POINTER>=1)
-		return XXH_OK;
-#else
-		return XXH_ERROR;
-#endif
-
-	state->total_len += len;
-
-	if (state->memsize + len < 32) { /* fill in tmp buffer */
-		XXH_memcpy(((BYTE*) state->mem64) + state->memsize, input, len);
-		state->memsize += (U32) len;
-		return XXH_OK;
-	}
-
-	if (state->memsize) { /* tmp buffer is full */
-		XXH_memcpy(((BYTE*) state->mem64) + state->memsize, input,
-				32 - state->memsize);
-		state->v1 = XXH64_round(state->v1,
-				XXH_readLE64(state->mem64 + 0, endian));
-		state->v2 = XXH64_round(state->v2,
-				XXH_readLE64(state->mem64 + 1, endian));
-		state->v3 = XXH64_round(state->v3,
-				XXH_readLE64(state->mem64 + 2, endian));
-		state->v4 = XXH64_round(state->v4,
-				XXH_readLE64(state->mem64 + 3, endian));
-		p += 32 - state->memsize;
-		state->memsize = 0;
-	}
-
-	if (p + 32 <= bEnd) {
-		const BYTE* const limit = bEnd - 32;
-		U64 v1 = state->v1;
-		U64 v2 = state->v2;
-		U64 v3 = state->v3;
-		U64 v4 = state->v4;
-
-		do {
-			v1 = XXH64_round(v1, XXH_readLE64(p, endian));
-			p += 8;
-			v2 = XXH64_round(v2, XXH_readLE64(p, endian));
-			p += 8;
-			v3 = XXH64_round(v3, XXH_readLE64(p, endian));
-			p += 8;
-			v4 = XXH64_round(v4, XXH_readLE64(p, endian));
-			p += 8;
-		} while (p <= limit);
-
-		state->v1 = v1;
-		state->v2 = v2;
-		state->v3 = v3;
-		state->v4 = v4;
-	}
-
-	if (p < bEnd) {
-		XXH_memcpy(state->mem64, p, (size_t) (bEnd - p));
-		state->memsize = (unsigned) (bEnd - p);
-	}
-
-	return XXH_OK;
-}
-
-XXH_PUBLIC_API XXH_errorcode XXH64_update(XXH64_state_t* state_in,
-		const void* input, size_t len) {
-	XXH_endianess endian_detected = (XXH_endianess) XXH_CPU_LITTLE_ENDIAN;
-
-	if ((endian_detected == XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
-		return XXH64_update_endian(state_in, input, len, XXH_littleEndian);
-	else
-		return XXH64_update_endian(state_in, input, len, XXH_bigEndian);
 }
 
 static U64 XXH64_mergeRound(U64 acc, U64 val) {
@@ -784,54 +673,11 @@ static U64 XXH64_finalize(U64 h64, const void* ptr, size_t len,
 	return 0; /* unreachable, but some compilers complain without it */
 }
 
-FORCE_INLINE U64 XXH64_digest_endian(const XXH64_state_t* state,
-		XXH_endianess endian) {
-	U64 h64;
-
-	if (state->total_len >= 32) {
-		U64 const v1 = state->v1;
-		U64 const v2 = state->v2;
-		U64 const v3 = state->v3;
-		U64 const v4 = state->v4;
-
-		h64 =
-				XXH_rotl64(v1,
-						1) + XXH_rotl64(v2, 7) + XXH_rotl64(v3, 12) + XXH_rotl64(v4, 18);
-		h64 = XXH64_mergeRound(h64, v1);
-		h64 = XXH64_mergeRound(h64, v2);
-		h64 = XXH64_mergeRound(h64, v3);
-		h64 = XXH64_mergeRound(h64, v4);
-	} else {
-		h64 = state->v3 /*seed*/+ PRIME64_5;
-	}
-
-	h64 += (U64) state->total_len;
-
-	return XXH64_finalize(h64, state->mem64, (size_t) state->total_len, endian,
-			XXH_aligned);
-}
-
-XXH_PUBLIC_API unsigned long long XXH64_digest(const XXH64_state_t* state_in) {
-	XXH_endianess endian_detected = (XXH_endianess) XXH_CPU_LITTLE_ENDIAN;
-
-	if ((endian_detected == XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
-		return XXH64_digest_endian(state_in, XXH_littleEndian);
-	else
-		return XXH64_digest_endian(state_in, XXH_bigEndian);
-}
-
 FORCE_INLINE U64 XXH64_endian_align(const void* input, size_t len, U64 seed,
 		XXH_endianess endian, XXH_alignment align) {
 	const BYTE* p = (const BYTE*) input;
 	const BYTE* bEnd = p + len;
 	U64 h64;
-
-#if defined(XXH_ACCEPT_NULL_INPUT_POINTER) && (XXH_ACCEPT_NULL_INPUT_POINTER>=1)
-	if (p==NULL) {
-		len=0;
-		bEnd=p=(const BYTE*)(size_t)32;
-	}
-#endif
 
 	if (len >= 32) {
 		const BYTE* const limit = bEnd - 32;
@@ -1141,25 +987,6 @@ int hash_map_robin_hood_back_shift_borra(hm_rr_bs_tabla *ht, const void *key,
 	}
 	return 1;
 }
-static inline int hash_map_robin_hood_back_shift_indice_inicio(
-		hm_rr_bs_tabla *ht) {
-	return ht->probing_min_;
-}
-static inline int hash_map_robin_hood_back_shift_indice_final(
-		hm_rr_bs_tabla *ht) {
-	return ht->probing_max_;
-}
-static inline bool hash_map_robin_hood_back_shift_indice_existe(
-		hm_rr_bs_tabla *ht, hm_iter indice) {
-	return !!ht->buckets_[indice].entry;
-}
-static inline const void *hash_map_robin_hood_back_shift_indice_obten_llave(
-		hm_rr_bs_tabla *ht, hm_iter indice) {
-	assert_timeout(indice <= ht->probing_max_ && indice >= ht->probing_min_);
-	hm_entry *entrada = ht->buckets_[indice].entry;
-	assert_timeout(entrada);
-	return entrada->llave;
-}
 static inline void hash_map_robin_hood_back_shift_indice_pon_valor(
 		hm_rr_bs_tabla *ht, hm_iter indice, entero_largo valor) {
 	assert_timeout(indice <= ht->probing_max_ && indice >= ht->probing_min_);
@@ -1233,17 +1060,6 @@ int hash_map_robin_hood_back_shift_indice_borra(hm_rr_bs_tabla *ht,
 	ht->num_buckets_used_--;
 	return 0;
 }
-static inline entero_largo hash_map_robin_hood_back_shift_indice_obten_valor(
-		hm_rr_bs_tabla *ht, hm_iter indice) {
-	assert_timeout(indice <= ht->probing_max_ && indice >= ht->probing_min_);
-	hm_entry *entrada = ht->buckets_[indice].entry;
-	assert_timeout(entrada);
-	return entrada->valor;
-}
-static inline bool hash_map_robin_hood_back_shift_esta_vacio(hm_rr_bs_tabla *ht) {
-	assert_timeout(ht->num_buckets_used_ <= ht->num_buckets_);
-	return !ht->num_buckets_used_;
-}
 
 static inline void hash_map_robin_hood_back_shift_reemplazar(hm_rr_bs_tabla *ht,
 		void *llave, natural llave_tam, entero_largo valor) {
@@ -1274,7 +1090,7 @@ static inline void hash_map_robin_hood_back_shift_insertar_nuevo(
 #if 1
 
 //http://www.thelearningpoint.net/computer-science/data-structures-heaps-with-c-program-source-code
-#define HEAP_SHIT_MAX_NODOS (300002)
+#define HEAP_SHIT_MAX_NODOS (100002)
 #define HEAP_SHIT_MAX_LLAVES HUARONVERGA_MAX_LLAVE
 #define HEAP_SHIT_VALOR_INVALIDO ((entero_largo_sin_signo)(((entero_largo_sin_signo)CACA_COMUN_VALOR_INVALIDO)<<32 | CACA_COMUN_VALOR_INVALIDO))
 
@@ -1321,7 +1137,7 @@ static inline heap_shit *heap_shit_init(bool es_min,
 	heap->tablon_llave_a_idx_heap = calloc(1, sizeof(hm_rr_bs_tabla));
 	assert_timeout(heap->tablon_llave_a_idx_heap);
 	hash_map_robin_hood_back_shift_init(heap->tablon_llave_a_idx_heap,
-	HEAP_SHIT_MAX_NODOS);
+	HEAP_SHIT_MAX_NODOS << 1);
 	heap->elem_a_cad_fn = elem_a_cad_fn;
 	return heap;
 }
@@ -1476,79 +1292,6 @@ static inline void heap_shit_insert(heap_shit *heap_ctx,
 #define heap_shit_insertar(heap_ctx,valor_in) heap_shit_insert(heap_ctx,&(heap_shit_nodo) {.valor=valor_in})
 #define heap_shit_insertar_valor_unico(heap_ctx,valor) heap_shit_insertar(heap_ctx,valor,valor,(void *)((entero_largo)valor))
 
-static inline void *heap_shit_delete(heap_shit *heap_ctx, natural idx) {
-	natural idx_last = heap_ctx->heap_size--;
-	natural heap_size = heap_ctx->heap_size;
-	heap_shit_nodo nodo = { 0 };
-	heap_shit_nodo *heap = heap_ctx->heap;
-	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
-	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
-	void *resultado;
-
-	assert_timeout(heap_size >= idx);
-	assert_timeout(idx);
-
-	memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
-	llave = heap_ctx->obten_llave_fn(heap[idx].valor, llave);
-	assert_timeout(
-			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-
-	resultado = heap[idx].valor;
-	hash_map_robin_hood_back_shift_borra(mapeo_inv, llave->contenido,
-			llave->contenido_tam);
-
-	if (idx != idx_last) {
-		assert_timeout(idx < idx_last);
-		memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
-		llave = heap_ctx->obten_llave_fn(heap[idx_last].valor, llave);
-		assert_timeout(
-				(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
-				llave->contenido_tam, idx);
-		heap[idx] = heap[idx_last];
-		heap_shit_push_down(heap_ctx, idx);
-	}
-
-	memset(heap + idx_last, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo));
-
-	return resultado;
-}
-
-static inline void *heap_shit_borrar_directo(heap_shit *heap_ctx, void *llave,
-		natural llave_tam) {
-	natural heap_size = heap_ctx->heap_size;
-	hm_rr_bs_tabla *indices_valores = heap_ctx->tablon_llave_a_idx_heap;
-	entero_largo idx_a_borrar;
-
-	assert_timeout(heap_size);
-
-	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
-			llave, llave_tam, &idx_a_borrar);
-	assert_timeout(idx_a_borrar <= heap_size);
-	caca_log_debug("borrando llave %d en idx %u en idx hm %u con heap size %u",
-			llave, idx_a_borrar, idx_hm, heap_size);
-	assert_timeout(idx_hm!=HASH_MAP_VALOR_INVALIDO);
-	assert_timeout(idx_a_borrar != HEAP_SHIT_VALOR_INVALIDO);
-
-	return heap_shit_delete(heap_ctx, idx_a_borrar);
-}
-
-static inline void *heap_shit_borra_torpe(heap_shit *heap_ctx) {
-	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
-
-	memset(llave, HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
-	llave = heap_ctx->obten_llave_fn(heap_ctx->heap[1].valor, llave);
-	assert_timeout(
-			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-	if (heap_ctx->heap_size) {
-		return heap_shit_borrar_directo(heap_ctx, llave->contenido,
-				llave->contenido_tam);
-	} else {
-		assert_timeout(!heap_ctx->heap[0].valor);
-		return NULL;
-	}
-}
-
 static inline void heap_shit_actualiza(heap_shit *ctx, void *valor) {
 	hm_rr_bs_tabla *indices_valores = ctx->tablon_llave_a_idx_heap;
 	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
@@ -1583,7 +1326,7 @@ static inline void heap_shit_actualiza(heap_shit *ctx, void *valor) {
 		heap_shit_push_up(ctx, idx);
 	} else {
 		caca_log_debug("empujando abajo %hu %d", ctx->min,
-				idx_p?ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor):0);
+				idx_p ? ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor) : 0);
 		heap_shit_push_down(ctx, idx);
 	}
 }
@@ -1654,14 +1397,6 @@ typedef struct my_list {
 	natural elementos_cnt;
 } listilla_fifo;
 
-typedef struct listilla_iterador {
-	listilla_fifo *ctx;
-	listilla_nodo *nodo_act;
-	bool primera_llamada;
-	natural llamadas;
-} listilla_iterador;
-
-/* Will always return the pointer to my_list */
 struct my_list* list_add_element(struct my_list* s, void *valor) {
 	struct my_struct* p = malloc(1 * sizeof(*p));
 
@@ -1678,7 +1413,6 @@ struct my_list* list_add_element(struct my_list* s, void *valor) {
 		free(p);
 		return s;
 	} else if ( NULL == s->head && NULL == s->tail) {
-		/* printf("Empty list, adding p->num: %d\n\n", p->num);  */
 		s->head = s->tail = p;
 		return s;
 	} else if ( NULL == s->head || NULL == s->tail) {
@@ -1687,7 +1421,6 @@ struct my_list* list_add_element(struct my_list* s, void *valor) {
 		free(p);
 		return NULL;
 	} else {
-		/* printf("List not empty, adding element to tail\n"); */
 		s->tail->next = p;
 		s->tail = p;
 	}
@@ -1696,7 +1429,6 @@ struct my_list* list_add_element(struct my_list* s, void *valor) {
 	return s;
 }
 
-/* This is a queue and it is FIFO, so we will always remove the first element */
 static void *list_remove_element(struct my_list* s) {
 	struct my_struct* h = NULL;
 	struct my_struct* p = NULL;
@@ -1743,82 +1475,6 @@ struct my_list* list_new(void) {
 	p->head = p->tail = NULL;
 
 	return p;
-}
-
-void list_print_element(const struct my_struct* p) {
-	if (p) {
-		printf("Num = %p\n", p->valor);
-	} else {
-		printf("Can not print NULL struct \n");
-	}
-}
-
-void list_print(const struct my_list* ps) {
-	struct my_struct* p = NULL;
-
-	if (ps) {
-		for (p = ps->head; p; p = p->next) {
-			list_print_element(p);
-		}
-	}
-
-	printf("------------------\n");
-}
-
-static bool list_empty(struct my_list *s) {
-	return !s->head;
-}
-
-static void list_iterador_init(listilla_fifo *ctx, listilla_iterador *iter) {
-	assert_timeout(!iter->ctx);
-	assert_timeout(!iter->primera_llamada);
-	assert_timeout(!iter->nodo_act);
-	assert_timeout(!iter->llamadas);
-	iter->ctx = ctx;
-	iter->nodo_act = NULL;
-	iter->primera_llamada = verdadero;
-	iter->llamadas = 0;
-}
-static void list_iterador_fini(listilla_iterador *iter) {
-	iter->ctx = NULL;
-	iter->nodo_act = NULL;
-	iter->primera_llamada = falso;
-	iter->llamadas = 0;
-}
-
-static void *list_iterador_peekea_actual(listilla_iterador *iter) {
-	return iter->nodo_act ? iter->nodo_act->valor : NULL;
-}
-
-static void *list_iterador_obten_siguiente(listilla_iterador *iter) {
-	if (iter->nodo_act) {
-		iter->nodo_act = iter->nodo_act->next;
-	} else {
-		if (iter->primera_llamada) {
-			iter->primera_llamada = falso;
-			iter->nodo_act = iter->ctx->head;
-		}
-	}
-	if (iter->nodo_act) {
-		iter->llamadas++;
-	}
-	return iter->nodo_act ? iter->nodo_act->valor : NULL;
-}
-static void *list_iterador_hay_siguiente(listilla_iterador *iter) {
-	listilla_nodo *siguiente = NULL;
-	if (!iter->nodo_act) {
-		if (iter->primera_llamada) {
-			siguiente = iter->ctx->head;
-		}
-	} else {
-		siguiente = iter->nodo_act->next;
-	}
-
-	return siguiente ? siguiente->valor : NULL;
-}
-
-static bool list_iterador_esta_initializado(listilla_iterador *iter) {
-	return !!iter->ctx;
 }
 
 #endif
@@ -2022,7 +1678,7 @@ static inline char *palabra_a_cadena(void *elemento, char *buffer) {
 static inline void word_crap_main() {
 	natural t = 0;
 
-	scanf("%u", &t);
+	scanf("%u\n", &t);
 	for (int i = 0; i < t; i++) {
 		natural n = 0;
 		natural k = 0;
@@ -2032,6 +1688,10 @@ static inline void word_crap_main() {
 		printf("Case %u:\n", i + 1);
 		scanf("%u %u\n", &n, &k);
 		caca_log_debug("mierda %u %u", n, k);
+		assert_timeout(n);
+		assert_timeout(n<=COLA_CONTEO_MAX_ELEMS);
+		assert_timeout(k);
+		assert_timeout(k<=COLA_CONTEO_MAX_ELEMS);
 
 		cola_conteo *caca = cola_conteo_init(k, word_crap_obten_llave,
 				word_crap_compara_palabras, palabra_a_cadena);
@@ -2040,13 +1700,18 @@ static inline void word_crap_main() {
 			palabra *p = don_palabras + palabras_cnt++;
 			palabra *r = NULL;
 			memset(p, '\0', sizeof(palabra));
-			scanf("%s\n", p->cadena);
+			if (scanf("%s\n", p->cadena) < 1) {
+				continue;
+			}
+//			fgets(p->cadena, WORD_CRAP_MAX_TAM_CAD, stdin);
+//			getline(&caca, &(size_t ) { WORD_CRAP_MAX_TAM_CAD }, stdin);
 			p->cadena_tam = strnlen(p->cadena, WORD_CRAP_MAX_TAM_CAD);
 
 			caca_log_debug("cacadena %s", p->cadena);
 			cola_conteo_anade_elemento(caca, p);
 
 			r = cola_conteo_torpe(caca);
+			assert_timeout(r);
 
 			printf("%s\n", r->cadena);
 		}
