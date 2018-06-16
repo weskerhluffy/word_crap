@@ -10,3 +10,5 @@ shit*
 src/caca.ref.log
 src/shame
 *.swp
+.DS_Store
+src/shame1
