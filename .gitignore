@@ -9,3 +9,4 @@ shit*
 *.c.log
 src/caca.ref.log
 src/shame
+*.swp

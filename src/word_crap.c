@@ -361,6 +361,7 @@ static inline natural caca_comun_max_natural(natural *nums, natural nums_tam) {
 	return max;
 }
 
+// XXX: https://stackoverflow.com/questions/122616/how-do-i-trim-leading-trailing-whitespace-in-a-standard-way?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
 static inline char *caca_comun_trimea(char *cad, natural cad_tam) {
 	char c = cad[0];
 	char tmp = '\0';
