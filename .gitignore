@@ -5,3 +5,7 @@ src/word_crap.dSYM/Contents/Resources/DWARF/word_crap
 src/word_crap
 src/shit*
 shit*
+*.shame.log
+*.c.log
+src/caca.ref.log
+src/shame

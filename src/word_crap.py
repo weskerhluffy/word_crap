@@ -1,6 +1,9 @@
+#!/Library/Frameworks/Python.framework/Versions/3.6/bin/python3
 # your code goes here
 from heapq import heapify, heappush, heappop
 from collections import deque
+from re import sub
+
 
 class priority_dict(dict):
     """Dictionary that can be used as a priority queue.
@@ -86,38 +89,42 @@ class priority_dict(dict):
         
         while self:
             yield self.pop_smallest()
+
             
 class window_counter_queue():
-	def __init__(self,cap):
-		self.cap=cap
-		self.count_queue=priority_dict()
-		self.window_queue=deque()
-		self.num_elems=0
-	
-	def add(self,elem):
-		if self.num_elems>=self.cap:
-			tail=self.window_queue.pop()
-			self.count_queue[tail]=(self.count_queue[tail][0]+1,tail)
-		self.window_queue.appendleft(elem)
-		if elem not in self.count_queue:
-			self.count_queue[elem]=(0,elem)
-		self.count_queue[elem]=(self.count_queue[elem][0]-1,elem)
-		self.num_elems+=1
-#		print("despuesde anadir {} kedo {}".format(elem,self.count_queue))
-	def top(self):
-		r=[]
-		if self.num_elems:
-			r=self.count_queue[self.count_queue.smallest()]
-		return r
 
-t=int(input())
+    def __init__(self, cap):
+        self.cap = cap
+        self.count_queue = priority_dict()
+        self.window_queue = deque()
+        self.num_elems = 0
+    
+    def add(self, elem):
+        if self.num_elems >= self.cap:
+            tail = self.window_queue.pop()
+            self.count_queue[tail] = (self.count_queue[tail][0] + 1, tail)
+        self.window_queue.appendleft(elem)
+        if elem not in self.count_queue:
+            self.count_queue[elem] = (0, elem)
+        self.count_queue[elem] = (self.count_queue[elem][0] - 1, elem)
+        self.num_elems += 1
+
+#         print("despuesde anadir {} kedo {}".format(elem,self.count_queue))
+    def top(self):
+        r = []
+        if self.num_elems:
+            r = self.count_queue[self.count_queue.smallest()]
+        return r
+
+
+t = int(input())
 for i in range(t):
-	n,k=[int(x) for x in input().strip().split(" ")]
-	wcq=window_counter_queue(k)
-	print("Case {}:".format(i+1))
-	for _ in range(n):
-		w=input().strip()
-		wcq.add(w)
-		r=wcq.top()
-		print("{} {}".format(r[1],r[0]*-1))
+    n, k = [int(x) for x in input().strip().split(" ")]
+    wcq = window_counter_queue(k)
+    print("Case {}:".format(i + 1))
+    for _ in range(n):
+        w = sub(r"[^a-z]+", "", input())
+        wcq.add(w)
+        r = wcq.top()
+        print("{} {}".format(r[1], r[0] * -1))
 

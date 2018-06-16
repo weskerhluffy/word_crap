@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #include <math.h>
 #include <stdint.h>
+#include <ctype.h>
 
 #ifdef CACA_COMUN_LOG
 #include <execinfo.h>
@@ -358,6 +359,41 @@ static inline natural caca_comun_max_natural(natural *nums, natural nums_tam) {
 	}
 
 	return max;
+}
+
+static inline char *caca_comun_trimea(char *cad, natural cad_tam) {
+	char c = cad[0];
+	char tmp = '\0';
+	natural i = 0;
+	natural j = 0;
+
+	caca_log_debug("entrada %s cad_tam %u", cad, cad_tam);
+	while (j < cad_tam && cad[j] != '\0') {
+		caca_log_debug("en j %u car %c", j, cad[j]);
+		while (j < cad_tam && !isalpha(cad[j])) {
+			caca_log_debug("brincando j %u car %c", j, cad[j]);
+			j++;
+		}
+		caca_log_debug("aora j %u car %c", j, cad[j]);
+		if (j == cad_tam) {
+			caca_log_debug("q ped");
+			break;
+		}
+		tmp = cad[i];
+		cad[i] = cad[j];
+		cad[j] = tmp;
+		i++;
+		j++;
+	}
+	caca_log_debug("mierda '%c'", cad[j]);
+
+	i = 0;
+	while (isalpha(cad[i++]))
+		;
+	caca_log_debug("salida %s", cad);
+	cad[i - 1] = '\0';
+
+	return cad;
 }
 
 #endif
@@ -1641,7 +1677,7 @@ static inline void *cola_conteo_torpe(cola_conteo *cola) {
 	return torpe;
 }
 
-#define WORD_CRAP_MAX_TAM_CAD 9
+#define WORD_CRAP_MAX_TAM_CAD 100
 typedef struct palabra {
 	char cadena[WORD_CRAP_MAX_TAM_CAD];
 	natural cadena_tam;
@@ -1687,6 +1723,7 @@ static inline void word_crap_main() {
 	for (int i = 0; i < t; i++) {
 		natural n = 0;
 		natural k = 0;
+		natural j = 0;
 
 		palabras_cnt = 0;
 
@@ -1701,16 +1738,25 @@ static inline void word_crap_main() {
 		cola_conteo *caca = cola_conteo_init(k, word_crap_obten_llave,
 				word_crap_compara_palabras, palabra_a_cadena);
 
-		for (int j = 0; j < n; j++) {
-			palabra *p = don_palabras + palabras_cnt++;
+		while (j < n) {
+			palabra *p = don_palabras + palabras_cnt;
 			palabra *r = NULL;
 			cola_conteo_elem *cc = NULL;
+			char *mierda = p->cadena;
+			size_t fuck = WORD_CRAP_MAX_TAM_CAD;
 			memset(p, '\0', sizeof(palabra));
-			if (scanf("%s\n", p->cadena) < 1) {
+			/*
+			 if (scanf("%s\n", p->cadena) < 1) {
+			 continue;
+			 }
+			 */
+			fgets(p->cadena, WORD_CRAP_MAX_TAM_CAD, stdin);
+//			getline(&mierda, &fuck, stdin);
+			caca_comun_trimea(mierda, WORD_CRAP_MAX_TAM_CAD);
+			if (strlen(p->cadena) < 1) {
 				continue;
 			}
-//			fgets(p->cadena, WORD_CRAP_MAX_TAM_CAD, stdin);
-//			getline(&caca, &(size_t ) { WORD_CRAP_MAX_TAM_CAD }, stdin);
+
 			p->cadena_tam = strnlen(p->cadena, WORD_CRAP_MAX_TAM_CAD);
 
 			caca_log_debug("cacadena %s", p->cadena);
@@ -1721,13 +1767,14 @@ static inline void word_crap_main() {
 			r = cc->elemento;
 			assert_timeout(r);
 
-			printf("%s %u\n", r->cadena, cc->conteo);
-			setbuf(stdout, NULL);
+			printf("%s %d\n", r->cadena, cc->conteo);
+//			setbuf(stdout, NULL);
+			j++;
+			palabras_cnt++;
 		}
 
 		cola_conteo_fini(caca);
 	}
-
 }
 
 int main(void) {

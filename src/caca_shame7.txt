@@ -1,0 +1,31 @@
+2
+8 3
+hello
+hi
+who
+hi
+hi
+hello
+who
+when
+20 6
+add
+add
+add
+spac
+spac
+qwe
+qwe
+qwe
+adda
+adda
+qwe
+qwe
+ass
+ass
+awe
+qwe
+ass
+ass
+qwe
+spac

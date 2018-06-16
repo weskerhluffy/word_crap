@@ -1,10 +1,10 @@
 1
 8 3
-hello
+hello         
+hi     
+wh o
+	h	i		
 hi
-who
-hi
-hi
-hello
-who
+h  ell o                   
+   wh	o  
 when

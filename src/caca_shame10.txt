@@ -1,0 +1,23 @@
+2
+10 1
+ass
+as
+asd
+afd
+as
+adf
+afd
+ass
+as
+add
+10 2
+ass
+as
+asd
+afd
+as
+adf
+afd
+ass
+as
+add
