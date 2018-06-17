@@ -44,7 +44,6 @@ ostream& operator<<(ostream& outs, const Caca & obj) {
  }
  */
 // XXX: http://neutrofoton.github.io/blog/2016/12/30/c-plus-plus-set-with-custom-comparator/
-
 struct compara_caca {
 	bool operator()(const Caca *a, const Caca *b) {
 		bool r = false;
@@ -68,13 +67,16 @@ int main() {
 		int n, k = 0;
 		cin >> n >> k;
 		cout << "Case " << u++ << ":" << endl;
-		unordered_map<string, Caca *> m;
+		unordered_map<string, std::set<Caca*, compara_caca>::iterator> m;
 		queue<string> q;
 		set<Caca *, compara_caca> v;
 		string s, l;
 		string p;
 		int i = 0;
-		Caca *ass = NULL;
+		std::pair<std::set<Caca *, compara_caca>::iterator, bool> culo;
+		std::set<Caca*, compara_caca>::iterator ass;
+		Caca *borrado = NULL;
+
 		while (i < n) {
 //			cin >> s;
 // XXX: https://stackoverflow.com/questions/5882872/reading-a-full-line-of-input
@@ -89,29 +91,42 @@ int main() {
 				p = q.front();
 				q.pop();
 				ass = m[p];
-//				cout << "conteo o de '" << p << "' s " << *ass << endl;
+				borrado = *ass;
+////				cout << "conteo o de '" << p << "' s " << *borrado << endl;
 				v.erase(ass);
 
-				ass->conteo--;
+				borrado->conteo--;
 
-//				cout << "conteo de '" << p << "' dism a " << *ass << endl;
-				v.insert(ass);
+//				cout << "conteo de '" << p << "' dism a " << *borrado << endl;
+				culo = v.insert(borrado);
+				m[p] = culo.first;
 
 			}
 			q.push(s);
 // XXX: https://stackoverflow.com/questions/3136520/determine-if-map-contains-a-value-for-a-key
-			unordered_map<string, Caca*>::iterator it1 = m.find(s);
+//			cout << "antes de bus en m " << endl;
+			unordered_map<string, std::set<Caca*, compara_caca>::iterator>::iterator it1 =
+					m.find(s);
+//			cout << "despues de bus en m " << endl;
 			if (it1 == m.end()) {
-				ass = new Caca(s);
-//				cout << "creado " << *ass << " mapeado a " << s << endl;
-				m[s] = ass;
+				borrado = new Caca(s);
+//				cout << "creado " << borrado << " mapeado a " << s << endl;
 			} else {
 				ass = it1->second;
+//				ass = m[s];
+				borrado = *ass;
+//				cout << "antes de borrar" << endl;
 				v.erase(ass);
+//				cout << "despes de borrar" << endl;
 			}
-			ass->conteo++;
-//			cout << "conteo de '" << s << "' aum a " << *ass << endl;
-			v.insert(ass);
+
+			borrado->conteo++;
+
+			culo = v.insert(borrado);
+			//		cout << "conteo de '" << s << "' aum a " << *borrado << endl;
+			ass = culo.first;
+			m[s] = ass;
+
 			set<Caca*, compara_caca>::iterator it = v.begin();
 			cout << (*it)->cadena << " " << (*it)->conteo << endl;
 			i++;
