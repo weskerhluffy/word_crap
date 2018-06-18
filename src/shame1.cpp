@@ -1125,6 +1125,35 @@ static inline void hash_map_robin_hood_back_shift_insertar_nuevo(
 
 #endif
 
+static inline hm_iter pon_en_ht(hm_rr_bs_tabla *ht, string &llave,
+		natural valor, hm_iter iter) {
+	if (iter != HASH_MAP_VALOR_INVALIDO) {
+		hash_map_robin_hood_back_shift_indice_pon_valor(ht, iter, valor);
+	} else {
+		booleano nuevo = falso;
+		iter = hash_map_robin_hood_back_shift_pon(ht,
+				(const void *) llave.c_str(), llave.size(), valor, &nuevo);
+		assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
+		assert_timeout(nuevo);
+	}
+	return iter;
+}
+
+static inline natural obten_de_ht(hm_rr_bs_tabla *ht, string &llave,
+		hm_iter *iter) {
+	hm_iter iter_int = HASH_MAP_VALOR_INVALIDO;
+	entero_largo valor = 0;
+
+	iter_int = hash_map_robin_hood_back_shift_obten(ht, (void *) llave.c_str(),
+			llave.size(), &valor);
+
+	assert_timeout(iter_int!=HASH_MAP_VALOR_INVALIDO);
+
+	*iter = iter_int;
+
+	return valor;
+}
+
 int main() {
 	ios_base::sync_with_stdio(false);
 	int t;
@@ -1134,18 +1163,20 @@ int main() {
 		int n, k, maxm = 0;
 		cin >> n >> k;
 		cout << "Case " << u++ << ":" << endl;
-		unordered_map<string, int> m;
+		unordered_map<string, natural> m;
 		queue<string> q;
 		set<string> v[n + 1];
 		string s, l;
 		string p = "";
 		int i = 0;
+		natural cp = 0;
+		natural cs = 0;
 		while (i < n) {
 //			cin >> s;
 // XXX: https://stackoverflow.com/questions/5882872/reading-a-full-line-of-input
 			getline(cin, s);
 // XXX: https://stackoverflow.com/questions/3418231/replace-part-of-a-string-with-another-string
-//			s = std::regex_replace(s, std::regex("\\s+"), "");
+			s = std::regex_replace(s, std::regex("\\s+"), "");
 			if (s.empty()) {
 				continue;
 			}
@@ -1153,29 +1184,32 @@ int main() {
 			if (q.size() >= k) {
 				p = q.front();
 				q.pop();
-				v[m[p]].erase(p);
-				m[p]--;
+				cp = m[p];
+				v[cp].erase(p);
+				cp--;
 
 //				cout << "conteo de '" << p << "' dism a " << m[p] << endl;
-				v[m[p]].insert(p);
-
+				v[cp].insert(p);
+				m[p] = cp;
 			}
 			q.push(s);
-			v[m[s]].erase(s);
-			m[s]++;
+			cs = m[s];
+			v[cs].erase(s);
+			cs++;
 //			cout << "conteo de '" << s << "' aum a " << m[s] << endl;
-			v[m[s]].insert(s);
+			v[cs].insert(s);
+			m[s] = cs;
 			if (!v[maxm].size()) {
 				maxm = 0;
 			}
-			if (m[s] > maxm) {
+			if (cs > maxm) {
 				l = s;
-				maxm = m[s];
+				maxm = cs;
 			}
 //			cout << "ass '" << p << "' " << endl;
 			if (!p.empty()) {
-				if (m[p] > maxm) {
-					maxm = m[p];
+				if (cp > maxm) {
+					maxm = cp;
 					l = p;
 				}
 			}
