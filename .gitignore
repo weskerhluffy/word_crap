@@ -12,3 +12,4 @@ src/shame
 *.swp
 .DS_Store
 src/shame1
+src/shame1.dSYM/Contents/Resources/DWARF/shame1

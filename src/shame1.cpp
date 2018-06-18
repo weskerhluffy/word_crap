@@ -66,11 +66,11 @@ typedef enum BOOLEANOS {
 	falso = 0, verdadero
 } booleano;
 
-#define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_SUAVECITO
 /*
+ #define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_SUAVECITO
  #define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_NIMADRES
- #define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_DUROTE
  */
+#define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_DUROTE
 
 #define assert_timeout_dummy(condition) 0;
 
@@ -808,6 +808,7 @@ static inline entero_largo_sin_signo hash_map_robin_hood_hashear(
 	entero_largo_sin_signo ass = 0;
 
 	ass = XXH64(mierda, mierda_tam, ass) % ht->num_buckets_;
+//	printf("cadena %s mapea a %llu\n", mierda, ass);
 	return ass;
 }
 
@@ -1147,70 +1148,103 @@ static inline natural obten_de_ht(hm_rr_bs_tabla *ht, string &llave,
 	iter_int = hash_map_robin_hood_back_shift_obten(ht, (void *) llave.c_str(),
 			llave.size(), &valor);
 
-	assert_timeout(iter_int!=HASH_MAP_VALOR_INVALIDO);
-
 	*iter = iter_int;
 
 	return valor;
 }
+
+string ss[100000];
 
 int main() {
 	ios_base::sync_with_stdio(false);
 	int t;
 	cin >> t;
 	int u = 1;
+
 	while (t--) {
 		int n, k, maxm = 0;
 		cin >> n >> k;
 		cout << "Case " << u++ << ":" << endl;
-		unordered_map<string, natural> m;
+		hm_rr_bs_tabla m_sto = { 0 };
+		hm_rr_bs_tabla *m = &m_sto;
 		queue<string> q;
 		set<string> v[n + 1];
-		string s, l;
 		string p = "";
 		int i = 0;
 		natural cp = 0;
 		natural cs = 0;
+		hm_iter iter = HASH_MAP_VALOR_INVALIDO;
+		natural s_cnt = 0;
+
+		hash_map_robin_hood_back_shift_init(m, 400000);
+
 		while (i < n) {
+			string l;
+//			string *s = ss + s_cnt++;
+			string *s = new string();
 //			cin >> s;
 // XXX: https://stackoverflow.com/questions/5882872/reading-a-full-line-of-input
-			getline(cin, s);
+			getline(cin, *s);
+//			(*s).assign(l);
 // XXX: https://stackoverflow.com/questions/3418231/replace-part-of-a-string-with-another-string
-			s = std::regex_replace(s, std::regex("\\s+"), "");
-			if (s.empty()) {
+//			(*s) = std::regex_replace(*s, std::regex("\\s+"), "");
+			if ((*s).empty()) {
 				continue;
 			}
-//			cout << "puta madre '" << s << "' " << endl;
+//			cout << "puta madre '" << *s << "' " << endl;
+//			cout << "la q " << q.size() << " la k " << k << endl;
 			if (q.size() >= k) {
 				p = q.front();
 				q.pop();
-				cp = m[p];
+
+//				cp = m[p];
+				cp = obten_de_ht(m, p, &iter);
+				assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
+
 				v[cp].erase(p);
 				cp--;
 
-//				cout << "conteo de '" << p << "' dism a " << m[p] << endl;
+//				cout << "conteo de '" << p << "' dism a " << cp << endl;
 				v[cp].insert(p);
-				m[p] = cp;
+
+//				m[p] = cp;
+				pon_en_ht(m, p, cp, iter);
 			}
-			q.push(s);
-			cs = m[s];
-			v[cs].erase(s);
+
+			q.push(*s);
+
+//			cs = m[s];
+			cs = obten_de_ht(m, *s, &iter);
+			if (iter == HASH_MAP_VALOR_INVALIDO) {
+				cs = 0;
+//				iter = pon_en_ht(m, s, cs, HASH_MAP_VALOR_INVALIDO);
+//				cout << "es nuevo" << endl;
+			} else {
+				v[cs].erase(*s);
+//				cout << "se encontro" << endl;
+				;
+			}
+
 			cs++;
-//			cout << "conteo de '" << s << "' aum a " << m[s] << endl;
-			v[cs].insert(s);
-			m[s] = cs;
+
+//			cout << "conteo de '" << s << "' aum a " << cs << endl;
+
+			v[cs].insert(*s);
+
+//			m[s] = cs;
+			iter = pon_en_ht(m, *s, cs, iter);
+			assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
+
 			if (!v[maxm].size()) {
 				maxm = 0;
 			}
 			if (cs > maxm) {
-				l = s;
 				maxm = cs;
 			}
 //			cout << "ass '" << p << "' " << endl;
 			if (!p.empty()) {
 				if (cp > maxm) {
 					maxm = cp;
-					l = p;
 				}
 			}
 
@@ -1218,6 +1252,8 @@ int main() {
 			cout << *it << " " << maxm << endl;
 			i++;
 		}
+
+		hash_map_robin_hood_back_shift_fini(m);
 	}
 	return 0;
 }
