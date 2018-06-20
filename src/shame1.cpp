@@ -402,6 +402,7 @@ static inline char *caca_comun_trimea(char *cad, natural cad_tam) {
 #if 1
 
 #if 1
+// XXX: https://github.com/Cyan4973/xxHash
 
 #define XXH_PUBLIC_API static inline
 #define FORCE_INLINE static inline
@@ -1122,6 +1123,586 @@ static inline void hash_map_robin_hood_back_shift_insertar_nuevo(
 
 	assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
 	assert_timeout(nuevo);
+}
+
+#endif
+
+#if 1
+
+//http://www.thelearningpoint.net/computer-science/data-structures-heaps-with-c-program-source-code
+#define HEAP_SHIT_MAX_NODOS (100002)
+#define HEAP_SHIT_MAX_LLAVES HUARONVERGA_MAX_LLAVE
+#define HEAP_SHIT_VALOR_INVALIDO ((entero_largo_sin_signo)(((entero_largo_sin_signo)CACA_COMUN_VALOR_INVALIDO)<<32 | CACA_COMUN_VALOR_INVALIDO))
+
+typedef struct heap_shit_nodo {
+	void *valor;
+} heap_shit_nodo;
+typedef struct heap_shit_nodo_llave {
+	void *contenido;
+	natural contenido_tam;
+} heap_shit_nodo_llave;
+typedef struct heap_shit heap_shit;
+
+typedef int (*heap_shit_compara_prioridad)(void *a, void *b);
+typedef heap_shit_nodo_llave *(*heap_shit_obten_llave)(void *valor,
+		heap_shit_nodo_llave *llave_res);
+typedef void *(*heap_shit_obten_prioridad)(void *valor);
+typedef char *(*heap_shit_elemento_a_cadena)(void *valor, char *buffer);
+
+struct heap_shit {
+	bool min;
+	natural heap_size;
+	heap_shit_nodo heap[HEAP_SHIT_MAX_NODOS];
+	hm_rr_bs_tabla *tablon_llave_a_idx_heap;
+	heap_shit_compara_prioridad compara_prioridad_fn;
+	heap_shit_obten_llave obten_llave_fn;
+	heap_shit_obten_prioridad obten_prioridad_fn;
+	heap_shit_elemento_a_cadena elem_a_cad_fn;
+};
+
+/*Initialize Heap*/
+static inline heap_shit *heap_shit_init(bool es_min,
+		heap_shit_compara_prioridad compara_prioridad_fn,
+		heap_shit_obten_llave obten_llave_fn,
+		heap_shit_obten_prioridad obten_prioridad_fn,
+		heap_shit_elemento_a_cadena elem_a_cad_fn) {
+	heap_shit *heap = (heap_shit*) calloc(1, sizeof(heap_shit));
+	assert_timeout(heap);
+	heap->heap_size = 0;
+	heap->min = es_min;
+	heap->compara_prioridad_fn = compara_prioridad_fn;
+	heap->obten_llave_fn = obten_llave_fn;
+	heap->obten_prioridad_fn = obten_prioridad_fn;
+	memset(heap->heap, (int) HEAP_SHIT_VALOR_INVALIDO, sizeof(heap->heap));
+	heap->tablon_llave_a_idx_heap = (hm_rr_bs_tabla *) calloc(1,
+			sizeof(hm_rr_bs_tabla));
+	assert_timeout(heap->tablon_llave_a_idx_heap);
+	hash_map_robin_hood_back_shift_init(heap->tablon_llave_a_idx_heap,
+	HEAP_SHIT_MAX_NODOS << 1);
+	heap->elem_a_cad_fn = elem_a_cad_fn;
+	return heap;
+}
+
+void heap_shit_fini(heap_shit *heap_ctx) {
+	hash_map_robin_hood_back_shift_fini(heap_ctx->tablon_llave_a_idx_heap);
+	free(heap_ctx->tablon_llave_a_idx_heap);
+	free(heap_ctx);
+}
+
+static inline natural heap_shit_idx_padre(natural idx_nodo) {
+	return idx_nodo >> 1;
+}
+
+static inline natural heap_shit_idx_hijo_izq(natural idx_nodo) {
+	return idx_nodo << 1;
+}
+
+static inline natural heap_shit_idx_hijo_der(natural idx_nodo) {
+	return heap_shit_idx_hijo_izq(idx_nodo) + 1;
+}
+
+static inline void heap_shit_push_up(heap_shit *heap_ctx, natural idx) {
+	natural heap_size = heap_ctx->heap_size;
+	heap_shit_nodo *heap = heap_ctx->heap;
+	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
+	heap_shit_nodo nodo;
+	heap_shit_nodo_llave llave_sto = { 0 };
+	heap_shit_nodo_llave *llave = &llave_sto;
+	natural idx_padre = 0;
+
+	assert_timeout(idx);
+	assert_timeout(idx <= heap_size);
+	assert_timeout(heap_size<HEAP_SHIT_MAX_NODOS);
+
+	nodo = heap[idx];
+
+	while ((idx_padre = heap_shit_idx_padre(idx))
+			&& ((heap_ctx->min
+					&& heap_ctx->compara_prioridad_fn(nodo.valor,
+							heap[idx_padre].valor) < 0)
+					|| (!heap_ctx->min
+							&& heap_ctx->compara_prioridad_fn(nodo.valor,
+									heap[idx_padre].valor) > 0))) {
+
+		memset(llave, (int) HEAP_SHIT_VALOR_INVALIDO,
+				sizeof(heap_shit_nodo_llave));
+		llave = heap_ctx->obten_llave_fn(heap[idx_padre].valor, llave);
+		assert_timeout(
+				(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+
+		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
+				llave->contenido_tam, idx);
+		heap[idx] = heap[idx_padre];
+		idx = idx_padre;
+	}
+
+	memset(llave, (int) HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+	llave = heap_ctx->obten_llave_fn(nodo.valor, llave);
+	assert_timeout(
+			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+	hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
+			llave->contenido_tam, idx);
+	heap[idx] = nodo;
+
+}
+
+static inline void heap_shit_push_down(heap_shit *heap_ctx, natural idx) {
+	natural heap_size = heap_ctx->heap_size;
+	heap_shit_nodo *heap = heap_ctx->heap;
+	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
+	heap_shit_nodo nodo = { 0 };
+	heap_shit_nodo_llave llave_sto = { 0 };
+	heap_shit_nodo_llave *llave = &llave_sto;
+
+	assert_timeout(idx);
+	assert_timeout(idx <= heap_size);
+	assert_timeout(heap_size<HEAP_SHIT_MAX_NODOS);
+	nodo = heap[idx];
+
+	while (heap_shit_idx_hijo_izq(idx) <= heap_size) {
+		natural idx_hijo_izq = heap_shit_idx_hijo_izq(idx);
+		natural idx_hijo_der = heap_shit_idx_hijo_der(idx);
+		natural idx_hijo = idx;
+		heap_shit_nodo *nodo_sig = &nodo;
+		if ((heap_ctx->min
+				&& heap_ctx->compara_prioridad_fn(nodo.valor,
+						heap[idx_hijo_izq].valor) > 1)
+				|| (!heap_ctx->min
+						&& heap_ctx->compara_prioridad_fn(nodo.valor,
+								heap[idx_hijo_izq].valor) < 1)) {
+			idx_hijo = idx_hijo_izq;
+			nodo_sig = heap + idx_hijo;
+		}
+
+		if (heap_shit_idx_hijo_der(idx) <= heap_size
+				&& ((heap_ctx->min
+						&& heap_ctx->compara_prioridad_fn(nodo_sig->valor,
+								heap[idx_hijo_der].valor) > 1)
+						|| (!heap_ctx->min
+								&& heap_ctx->compara_prioridad_fn(
+										nodo_sig->valor,
+										heap[idx_hijo_der].valor) < 1))) {
+			idx_hijo = idx_hijo_der;
+			nodo_sig = heap + idx_hijo;
+		}
+		if (idx == idx_hijo) {
+			break;
+		}
+
+		memset(llave, (int) HEAP_SHIT_VALOR_INVALIDO,
+				sizeof(heap_shit_nodo_llave));
+		llave = heap_ctx->obten_llave_fn(nodo_sig->valor, llave);
+		assert_timeout(
+				(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
+				llave->contenido_tam, idx);
+		heap[idx] = heap[idx_hijo];
+		idx = idx_hijo;
+	}
+
+	memset(llave, (int) HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+	llave = heap_ctx->obten_llave_fn(nodo.valor, llave);
+	assert_timeout(
+			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+	hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
+			llave->contenido_tam, idx);
+	heap[idx] = nodo;
+
+}
+
+/*Insert an element into the heap */
+static inline void heap_shit_insert(heap_shit *heap_ctx,
+		heap_shit_nodo *nodo_nuevo) {
+	natural heap_size = ++heap_ctx->heap_size;
+	heap_shit_nodo *heap = heap_ctx->heap;
+	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
+	heap_shit_nodo_llave llave_sto = { 0 };
+	heap_shit_nodo_llave *llave = &llave_sto;
+
+	assert_timeout(heap_size<HEAP_SHIT_MAX_NODOS);
+
+	memset(llave, (int) HEAP_SHIT_VALOR_INVALIDO, sizeof(heap_shit_nodo_llave));
+	llave = heap_ctx->obten_llave_fn(nodo_nuevo->valor, llave);
+	assert_timeout(
+			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
+	hash_map_robin_hood_back_shift_insertar_nuevo(mapeo_inv, llave->contenido,
+			llave->contenido_tam, heap_size);
+	heap[heap_size] = *nodo_nuevo; /*Insert in the last place*/
+
+	caca_log_debug("insertado inicialmene %s en %u",
+			heap_ctx->elem_a_cad_fn(heap[heap_size].valor,CACA_COMUN_BUF_STATICO),
+			heap_size);
+	heap_shit_push_up(heap_ctx, heap_size);
+}
+
+#define heap_shit_insertar(heap_ctx,valor_in) heap_shit_insert(heap_ctx,&(heap_shit_nodo) {.valor=valor_in})
+#define heap_shit_insertar_valor_unico(heap_ctx,valor) heap_shit_insertar(heap_ctx,valor,valor,(void *)((entero_largo)valor))
+
+static inline void heap_shit_actualiza(heap_shit *ctx, void *valor) {
+	hm_rr_bs_tabla *indices_valores = ctx->tablon_llave_a_idx_heap;
+	heap_shit_nodo_llave llave_sto = { 0 };
+	heap_shit_nodo_llave *llave = &llave_sto;
+	heap_shit_nodo *heap = ctx->heap;
+	entero_largo idx = 0;
+	entero_largo idx_p = 0;
+	heap_shit_nodo *nodo = NULL;
+
+	llave = ctx->obten_llave_fn(valor, llave);
+
+	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
+			llave->contenido, llave->contenido_tam, &idx);
+	assert_timeout(idx_hm!=HASH_MAP_VALOR_INVALIDO);
+	nodo = heap + idx;
+	idx_p = heap_shit_idx_padre(idx);
+
+	caca_log_debug("actualizando %s",
+			ctx->elem_a_cad_fn(nodo->valor,CACA_COMUN_BUF_STATICO));
+
+	caca_log_debug("%s i su padre %s",
+			ctx->elem_a_cad_fn(nodo->valor,CACA_COMUN_BUF_STATICO),
+			idx_p?ctx->elem_a_cad_fn(heap[idx_p].valor,CACA_COMUN_BUF_STATICO):"NADA");
+	if (idx_p
+			&& ((ctx->min
+					&& ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor)
+							< 1)
+					|| (!ctx->min
+							&& ctx->compara_prioridad_fn(nodo->valor,
+									heap[idx_p].valor) > 0))) {
+		caca_log_debug("empujando arriba %hu %d", ctx->min,
+				ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor));
+		heap_shit_push_up(ctx, idx);
+	} else {
+		caca_log_debug("empujando abajo %hu %d", ctx->min,
+				idx_p ? ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor) : 0);
+		heap_shit_push_down(ctx, idx);
+	}
+}
+
+static inline void *heap_shit_consulta_prioridad(heap_shit *ctx, void *llave,
+		natural llave_tam) {
+	hm_rr_bs_tabla *indices_valores = ctx->tablon_llave_a_idx_heap;
+	heap_shit_nodo *heap = ctx->heap;
+	void *prio = NULL;
+	entero_largo idx = 0;
+	heap_shit_nodo *nodo = NULL;
+
+	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
+			llave, llave_tam, &idx);
+	assert_timeout(idx_hm!=HASH_MAP_VALOR_INVALIDO);
+	assert_timeout(idx);
+
+	nodo = heap + idx;
+
+	prio = ctx->obten_prioridad_fn(nodo->valor);
+
+	return prio;
+}
+
+static inline void *heap_shit_contiene_elemento(heap_shit *ctx, void *llave,
+		natural llave_tam) {
+	hm_rr_bs_tabla *indices_valores = ctx->tablon_llave_a_idx_heap;
+	heap_shit_nodo *heap = ctx->heap;
+	entero_largo idx = 0;
+	heap_shit_nodo *nodo = NULL;
+	void *elem = NULL;
+
+	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
+			llave, llave_tam, &idx);
+	if (idx_hm != HASH_MAP_VALOR_INVALIDO) {
+		assert_timeout(idx);
+		nodo = heap + idx;
+		elem = nodo->valor;
+	}
+
+	return elem;
+}
+
+static inline void *heap_shit_consulta_torpe(heap_shit *heap_ctx) {
+	natural heap_size = heap_ctx->heap_size;
+	heap_shit_nodo *heap = heap_ctx->heap;
+
+	if (heap_size) {
+		return heap[1].valor;
+	} else {
+		assert_timeout(!heap_ctx->heap[0].valor);
+		return NULL;
+	}
+}
+
+#endif
+
+#if 1
+
+typedef struct my_struct {
+	void *valor;
+	struct my_struct* next;
+} listilla_nodo;
+
+typedef struct my_list {
+	struct my_struct* head;
+	struct my_struct* tail;
+	natural elementos_cnt;
+} listilla_fifo;
+
+struct my_list* list_add_element(struct my_list* s, void *valor) {
+	struct my_struct* p = (my_struct *) malloc(1 * sizeof(*p));
+
+	if ( NULL == p) {
+		fprintf(stderr, "IN %s, %s: malloc() failed\n", __FILE__, "list_add");
+		return s;
+	}
+
+	p->valor = valor;
+	p->next = NULL;
+
+	if ( NULL == s) {
+		printf("Queue not initialized\n");
+		free(p);
+		return s;
+	} else if ( NULL == s->head && NULL == s->tail) {
+		s->head = s->tail = p;
+		return s;
+	} else if ( NULL == s->head || NULL == s->tail) {
+		fprintf(stderr,
+				"There is something seriously wrong with your assignment of head/tail to the list\n");
+		free(p);
+		return NULL;
+	} else {
+		s->tail->next = p;
+		s->tail = p;
+	}
+	s->elementos_cnt++;
+
+	return s;
+}
+
+static void *list_remove_element(struct my_list* s) {
+	struct my_struct* h = NULL;
+	struct my_struct* p = NULL;
+	void *valor = NULL;
+
+	if ( NULL == s) {
+		printf("List is empty\n");
+		return s;
+	} else if ( NULL == s->head && NULL == s->tail) {
+		printf("Well, List is empty\n");
+		return s;
+	} else if ( NULL == s->head || NULL == s->tail) {
+		printf("There is something seriously wrong with your list\n");
+		printf("One of the head/tail is empty while other is not \n");
+		abort();
+	}
+
+	h = s->head;
+	valor = h->valor;
+	p = h->next;
+	free(h);
+	s->head = p;
+	if ( NULL == s->head)
+		s->tail = s->head; /* The element tail was pointing to is free(), so we need an update */
+
+	s->elementos_cnt--;
+	return valor;
+}
+
+/* ---------------------- small helper fucntions ---------------------------------- */
+struct my_list* list_free(struct my_list* s) {
+	while (s->head) {
+		list_remove_element(s);
+	}
+
+	return s;
+}
+
+struct my_list* list_new(void) {
+	struct my_list* p = (my_list *) malloc(1 * sizeof(*p));
+
+	assert_timeout(p);
+
+	p->head = p->tail = NULL;
+
+	return p;
+}
+
+#endif
+
+#if 1
+
+typedef struct cola_conteo_llave {
+	void *contenido;
+	natural contenido_tam;
+} cola_conteo_llave;
+
+typedef cola_conteo_llave *(*cola_conteo_obten_llave_fn)(void *elemento,
+		cola_conteo_llave *llave_mem);
+
+typedef int (*cola_conteo_comparar_elementos_fn)(void *a, void *b);
+typedef char *(*cola_conteo_elemento_a_cadena_fn)(void *elemento, char *buffer);
+
+typedef struct cola_conteo {
+	listilla_fifo *elementos;
+	heap_shit *monton_conteo_elementos;
+	natural limite;
+	natural elementos_cnt;
+	cola_conteo_obten_llave_fn obten_llave_fn;
+	cola_conteo_comparar_elementos_fn comp_elems_fn;
+	cola_conteo_elemento_a_cadena_fn elem_a_cad_fn;
+} cola_conteo;
+
+typedef struct cola_conteo_elem {
+	void *elemento;
+	natural conteo;
+	cola_conteo *cola;
+} cola_conteo_elem;
+
+#define COLA_CONTEO_MAX_ELEMS ((natural)1E5)
+cola_conteo_elem conteo_elems[COLA_CONTEO_MAX_ELEMS] = { 0 };
+natural conteo_elemns_cnt = 0;
+
+static inline int cola_conteo_compara_elementos_conteo(void *pa, void *pb) {
+	cola_conteo_elem *a = (cola_conteo_elem *) pa;
+	cola_conteo_elem *b = (cola_conteo_elem *) pb;
+	cola_conteo *cola = a->cola;
+	int res = 0;
+
+	assert_timeout(a->cola == b->cola);
+
+	res = a->conteo - b->conteo;
+
+	if (!res) {
+		res = cola->comp_elems_fn(a->elemento, b->elemento);
+	}
+	caca_log_debug("comp %s:%u con %s:%u r %d",
+			cola->elem_a_cad_fn(a->elemento,CACA_COMUN_BUF_STATICO), a->conteo,
+			cola->elem_a_cad_fn(b->elemento,CACA_COMUN_BUF_STATICO), b->conteo,
+			res)
+
+	return res;
+}
+
+static inline heap_shit_nodo_llave* cola_conteo_obten_llave_elemento(
+		void *elemento, heap_shit_nodo_llave *llave) {
+	cola_conteo_elem *e = (cola_conteo_elem *) elemento;
+	cola_conteo *cola = e->cola;
+	cola_conteo_llave cllave_sto = { (void *) HEAP_SHIT_VALOR_INVALIDO };
+	cola_conteo_llave *cllave = &cllave_sto;
+
+	cllave = cola->obten_llave_fn(e->elemento, cllave);
+
+	assert_timeout(cllave->contenido!=(void *)HEAP_SHIT_VALOR_INVALIDO);
+
+	llave->contenido = cllave->contenido;
+	llave->contenido_tam = cllave->contenido_tam;
+
+	return llave;
+}
+
+static inline void *cola_conteo_obten_conteo(void *elemento) {
+	return elemento;
+}
+
+static inline char *cola_conteo_elemento_a_cadena(void *elemento,
+		char *buffer) {
+	cola_conteo_elem *e = (cola_conteo_elem *) elemento;
+	cola_conteo *cola = e->cola;
+
+	sprintf(buffer, "elem %s tiene cnt %u",
+			cola->elem_a_cad_fn(e->elemento, CACA_COMUN_BUF_STATICO),
+			e->conteo);
+
+	return buffer;
+}
+
+static inline cola_conteo *cola_conteo_init(natural limite,
+		cola_conteo_obten_llave_fn obten_llave_fn,
+		cola_conteo_comparar_elementos_fn comp_elem_fn,
+		cola_conteo_elemento_a_cadena_fn elem_a_cad_fn) {
+	cola_conteo *cola = (cola_conteo *) calloc(1, sizeof(cola_conteo));
+	assert_timeout(cola);
+	cola->elementos = list_new();
+	cola->monton_conteo_elementos = heap_shit_init(falso,
+			cola_conteo_compara_elementos_conteo,
+			cola_conteo_obten_llave_elemento, cola_conteo_obten_conteo,
+			cola_conteo_elemento_a_cadena);
+	cola->limite = limite;
+	cola->obten_llave_fn = obten_llave_fn;
+	cola->comp_elems_fn = comp_elem_fn;
+	cola->elem_a_cad_fn = elem_a_cad_fn;
+	conteo_elemns_cnt = 0;
+	return cola;
+}
+
+static inline void cola_conteo_fini(cola_conteo *cola) {
+	heap_shit_fini(cola->monton_conteo_elementos);
+	list_free(cola->elementos);
+	memset(cola, 0xff, sizeof(cola_conteo));
+	free(cola);
+}
+
+static inline void cola_conteo_anade_elemento(cola_conteo *cola,
+		void *elemento) {
+	cola_conteo_elem *conteo_act = NULL;
+	cola_conteo_llave llave_sto = { (void *) HEAP_SHIT_VALOR_INVALIDO };
+	cola_conteo_llave *llave = &llave_sto;
+	caca_log_debug("cnt %u limte %u", cola->elementos_cnt, cola->limite);
+	if (cola->elementos_cnt >= cola->limite) {
+		void *elem_a_borrar = list_remove_element(cola->elementos);
+		llave = cola->obten_llave_fn(elem_a_borrar, llave);
+		conteo_act = (cola_conteo_elem*) heap_shit_consulta_prioridad(
+				cola->monton_conteo_elementos, llave->contenido,
+				llave->contenido_tam);
+		assert_timeout(conteo_act);
+		assert_timeout(conteo_act->conteo);
+
+		caca_log_debug("antes de dec %s es %u", (conteo_act->elemento),
+				conteo_act->conteo);
+		conteo_act->conteo--;
+
+		heap_shit_actualiza(cola->monton_conteo_elementos, conteo_act);
+
+		caca_log_debug("decrementado %s aora %u", (conteo_act->elemento),
+				conteo_act->conteo);
+		cola->elementos_cnt--;
+	}
+
+	list_add_element(cola->elementos, elemento);
+	llave = cola->obten_llave_fn(elemento, llave);
+	if ((conteo_act = (cola_conteo_elem *) heap_shit_contiene_elemento(
+			cola->monton_conteo_elementos, llave->contenido,
+			llave->contenido_tam))) {
+		caca_log_debug("antes de inc %s tiene %u", (conteo_act->elemento),
+				conteo_act->conteo);
+		conteo_act->conteo++;
+		heap_shit_actualiza(cola->monton_conteo_elementos, conteo_act);
+		caca_log_debug("incrementado %s aora %u", (conteo_act->elemento),
+				conteo_act->conteo);
+	} else {
+		cola_conteo_elem *cont_elem = conteo_elems + conteo_elemns_cnt++;
+		heap_shit_nodo *n = NULL;
+		cont_elem->elemento = elemento;
+		cont_elem->conteo = 1;
+		cont_elem->cola = cola;
+
+		n = (heap_shit_nodo *) calloc(1, sizeof(heap_shit_nodo));
+		assert_timeout(n);
+
+		n->valor = cont_elem;
+
+		heap_shit_insert(cola->monton_conteo_elementos, n);
+
+		caca_log_debug("anadido %s aora %u", (cont_elem->elemento),
+				cont_elem->conteo);
+
+		free(n);
+	}
+	cola->elementos_cnt++;
+}
+
+static inline void *cola_conteo_torpe(cola_conteo *cola) {
+	cola_conteo_elem *torpe = NULL;
+	torpe = (cola_conteo_elem *) heap_shit_consulta_torpe(
+			cola->monton_conteo_elementos);
+	return torpe;
 }
 
 #endif
