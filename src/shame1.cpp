@@ -1734,7 +1734,37 @@ static inline natural obten_de_ht(hm_rr_bs_tabla *ht, string &llave,
 	return valor;
 }
 
-string ss[100000];
+cola_conteo_llave *word_crap_obten_llave(void *elemento,
+		cola_conteo_llave *llave_mem) {
+	string *p = (string *)elemento;
+
+	llave_mem->contenido = &p;
+	llave_mem->contenido_tam = p->size();
+
+	return llave_mem;
+}
+
+int word_crap_compara_palabras(void *pa, void *pb) {
+	string *a = (string *)pa;
+	string *b = (string *)pb;
+	int r = 0;
+
+	if (a->compare(*b)) {
+		r = -1;
+	}
+	if (b->compare(*a)) {
+		r = 1;
+	}
+
+	caca_log_debug("comparando %s con %s r %d", a, b, r);
+	return r;
+}
+
+static inline char *palabra_a_cadena(void *elemento, char *buffer) {
+	string *p = (string *)elemento;
+	sprintf(buffer, "%s:%lu", p->c_str(), p->size());
+	return buffer;
+}
 
 int main() {
 	ios_base::sync_with_stdio(false);
