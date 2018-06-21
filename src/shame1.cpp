@@ -809,7 +809,7 @@ static inline entero_largo_sin_signo hash_map_robin_hood_hashear(
 	entero_largo_sin_signo ass = 0;
 
 	ass = XXH64(mierda, mierda_tam, ass) % ht->num_buckets_;
-//	printf("cadena %s mapea a %llu\n", mierda, ass);
+	caca_log_debug("cadena %s mapea a %llu", mierda, ass);
 	return ass;
 }
 
@@ -1644,7 +1644,8 @@ static inline void cola_conteo_anade_elemento(cola_conteo *cola,
 	cola_conteo_elem *conteo_act = NULL;
 	cola_conteo_llave llave_sto = { (void *) HEAP_SHIT_VALOR_INVALIDO };
 	cola_conteo_llave *llave = &llave_sto;
-	caca_log_debug("cnt %u limte %u", cola->elementos_cnt, cola->limite);
+	caca_log_debug("cnt %u limte %u elemento %s", cola->elementos_cnt,
+			cola->limite, cola->elem_a_cad_fn(elemento,CACA_COMUN_BUF_STATICO));
 	if (cola->elementos_cnt >= cola->limite) {
 		void *elem_a_borrar = list_remove_element(cola->elementos);
 		llave = cola->obten_llave_fn(elem_a_borrar, llave);
@@ -1654,13 +1655,15 @@ static inline void cola_conteo_anade_elemento(cola_conteo *cola,
 		assert_timeout(conteo_act);
 		assert_timeout(conteo_act->conteo);
 
-		caca_log_debug("antes de dec %s es %u", (conteo_act->elemento),
+		caca_log_debug("antes de dec %s es %u",
+				cola->elem_a_cad_fn(conteo_act->elemento,CACA_COMUN_BUF_STATICO),
 				conteo_act->conteo);
 		conteo_act->conteo--;
 
 		heap_shit_actualiza(cola->monton_conteo_elementos, conteo_act);
 
-		caca_log_debug("decrementado %s aora %u", (conteo_act->elemento),
+		caca_log_debug("decrementado %s aora %u",
+				cola->elem_a_cad_fn(conteo_act->elemento,CACA_COMUN_BUF_STATICO),
 				conteo_act->conteo);
 		cola->elementos_cnt--;
 	}
@@ -1670,11 +1673,13 @@ static inline void cola_conteo_anade_elemento(cola_conteo *cola,
 	if ((conteo_act = (cola_conteo_elem *) heap_shit_contiene_elemento(
 			cola->monton_conteo_elementos, llave->contenido,
 			llave->contenido_tam))) {
-		caca_log_debug("antes de inc %s tiene %u", (conteo_act->elemento),
+		caca_log_debug("antes de inc %s tiene %u",
+				cola->elem_a_cad_fn(conteo_act->elemento,CACA_COMUN_BUF_STATICO),
 				conteo_act->conteo);
 		conteo_act->conteo++;
 		heap_shit_actualiza(cola->monton_conteo_elementos, conteo_act);
-		caca_log_debug("incrementado %s aora %u", (conteo_act->elemento),
+		caca_log_debug("incrementado %s aora %u",
+				cola->elem_a_cad_fn(conteo_act->elemento,CACA_COMUN_BUF_STATICO),
 				conteo_act->conteo);
 	} else {
 		cola_conteo_elem *cont_elem = conteo_elems + conteo_elemns_cnt++;
@@ -1690,7 +1695,8 @@ static inline void cola_conteo_anade_elemento(cola_conteo *cola,
 
 		heap_shit_insert(cola->monton_conteo_elementos, n);
 
-		caca_log_debug("anadido %s aora %u", (cont_elem->elemento),
+		caca_log_debug("anadido %s aora %u",
+				cola->elem_a_cad_fn(cont_elem->elemento,CACA_COMUN_BUF_STATICO),
 				cont_elem->conteo);
 
 		free(n);
@@ -1736,32 +1742,29 @@ static inline natural obten_de_ht(hm_rr_bs_tabla *ht, string &llave,
 
 cola_conteo_llave *word_crap_obten_llave(void *elemento,
 		cola_conteo_llave *llave_mem) {
-	string *p = (string *)elemento;
+	string *p = (string *) elemento;
 
-	llave_mem->contenido = &p;
+// XXX: https://stackoverflow.com/questions/13294067/how-to-convert-string-to-char-array-in-c
+	llave_mem->contenido = (char *)p->c_str();
 	llave_mem->contenido_tam = p->size();
+
+	caca_log_debug("la llave es %s:%u", llave_mem->contenido,
+			llave_mem->contenido_tam);
 
 	return llave_mem;
 }
 
 int word_crap_compara_palabras(void *pa, void *pb) {
-	string *a = (string *)pa;
-	string *b = (string *)pb;
-	int r = 0;
+	string *a = (string *) pa;
+	string *b = (string *) pb;
+	int r = b->compare(*a);
 
-	if (a->compare(*b)) {
-		r = -1;
-	}
-	if (b->compare(*a)) {
-		r = 1;
-	}
-
-	caca_log_debug("comparando %s con %s r %d", a, b, r);
+	caca_log_debug("comparando %s con %s r %d", a->c_str(), b->c_str(), r);
 	return r;
 }
 
 static inline char *palabra_a_cadena(void *elemento, char *buffer) {
-	string *p = (string *)elemento;
+	string *p = (string *) elemento;
 	sprintf(buffer, "%s:%lu", p->c_str(), p->size());
 	return buffer;
 }
@@ -1776,95 +1779,43 @@ int main() {
 		int n, k, maxm = 0;
 		cin >> n >> k;
 		cout << "Case " << u++ << ":" << endl;
-		hm_rr_bs_tabla m_sto = { 0 };
-		hm_rr_bs_tabla *m = &m_sto;
-		queue<string> q;
-		set<string> v[n + 1];
 		string p = "";
 		int i = 0;
 		natural cp = 0;
 		natural cs = 0;
 		hm_iter iter = HASH_MAP_VALOR_INVALIDO;
 		natural s_cnt = 0;
+		cola_conteo *cola = NULL;
 
-		hash_map_robin_hood_back_shift_init(m, 400000);
+		cola = cola_conteo_init(k, word_crap_obten_llave,
+				word_crap_compara_palabras, palabra_a_cadena);
 
 		while (i < n) {
 			string l;
 //			string *s = ss + s_cnt++;
 			string *s = new string();
+			string *t = NULL;
+			cola_conteo_elem *cc = NULL;
 //			cin >> s;
 // XXX: https://stackoverflow.com/questions/5882872/reading-a-full-line-of-input
 			getline(cin, *s);
-//			(*s).assign(l);
+			caca_log_debug("mierda %s", s->c_str());
 // XXX: https://stackoverflow.com/questions/3418231/replace-part-of-a-string-with-another-string
-//			(*s) = std::regex_replace(*s, std::regex("\\s+"), "");
+			(*s) = std::regex_replace(*s, std::regex("\\s+"), "");
 			if ((*s).empty()) {
 				continue;
 			}
-//			cout << "puta madre '" << *s << "' " << endl;
-//			cout << "la q " << q.size() << " la k " << k << endl;
-			if (q.size() >= k) {
-				p = q.front();
-				q.pop();
 
-//				cp = m[p];
-				cp = obten_de_ht(m, p, &iter);
-				assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
+			cola_conteo_anade_elemento(cola, s);
+			cc = (cola_conteo_elem *) cola_conteo_torpe(cola);
+			t = (string *) cc->elemento;
 
-				v[cp].erase(p);
-				cp--;
-
-//				cout << "conteo de '" << p << "' dism a " << cp << endl;
-				v[cp].insert(p);
-
-//				m[p] = cp;
-				pon_en_ht(m, p, cp, iter);
-			}
-
-			q.push(*s);
-
-//			cs = m[s];
-			cs = obten_de_ht(m, *s, &iter);
-			if (iter == HASH_MAP_VALOR_INVALIDO) {
-				cs = 0;
-//				iter = pon_en_ht(m, s, cs, HASH_MAP_VALOR_INVALIDO);
-//				cout << "es nuevo" << endl;
-			} else {
-				v[cs].erase(*s);
-//				cout << "se encontro" << endl;
-				;
-			}
-
-			cs++;
-
-//			cout << "conteo de '" << s << "' aum a " << cs << endl;
-
-			v[cs].insert(*s);
-
-//			m[s] = cs;
-			iter = pon_en_ht(m, *s, cs, iter);
-			assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
-
-			if (!v[maxm].size()) {
-				maxm = 0;
-			}
-			if (cs > maxm) {
-				maxm = cs;
-			}
-//			cout << "ass '" << p << "' " << endl;
-			if (!p.empty()) {
-				if (cp > maxm) {
-					maxm = cp;
-				}
-			}
-
-			set<string>::iterator it = v[maxm].begin();
-			cout << *it << " " << maxm << endl;
+			cout << *t << " " << cc->conteo << endl;
 			i++;
 		}
 
-		hash_map_robin_hood_back_shift_fini(m);
+		cola_conteo_fini(cola);
+
 	}
 	return 0;
 }
