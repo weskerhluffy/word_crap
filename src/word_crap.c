@@ -67,11 +67,11 @@ typedef enum BOOLEANOS {
 	falso = 0, verdadero
 } bool;
 
-#define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_SUAVECITO
 /*
+ #define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_SUAVECITO
  #define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_NIMADRES
- #define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_DUROTE
  */
+#define CACA_COMUN_TIPO_ASSERT CACA_COMUN_ASSERT_DUROTE
 
 #define assert_timeout_dummy(condition) 0;
 
@@ -1708,6 +1708,7 @@ int word_crap_compara_palabras(void *pa, void *pb) {
 	}
 
 	caca_log_debug("comparando %s con %s r %d", a->cadena, b->cadena, r);
+	assert_timeout(r);
 	return r;
 }
 
@@ -1754,6 +1755,7 @@ static inline void word_crap_main() {
 			fgets(p->cadena, WORD_CRAP_MAX_TAM_CAD, stdin);
 //			getline(&mierda, &fuck, stdin);
 			caca_comun_trimea(mierda, WORD_CRAP_MAX_TAM_CAD);
+			assert_timeout(strlen(p->cadena));
 			if (strlen(p->cadena) < 1) {
 				continue;
 			}
