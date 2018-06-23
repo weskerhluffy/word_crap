@@ -1354,7 +1354,7 @@ static inline void heap_shit_actualiza(heap_shit *ctx, void *valor) {
 	if (idx_p
 			&& ((ctx->min
 					&& ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor)
-							< 1)
+							< 0)
 					|| (!ctx->min
 							&& ctx->compara_prioridad_fn(nodo->valor,
 									heap[idx_p].valor) > 0))) {

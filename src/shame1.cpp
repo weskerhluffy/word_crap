@@ -10,7 +10,6 @@
 using namespace std;
 
 #if 1
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,7 +42,7 @@ using namespace std;
 #define CACA_COMUN_TAM_MAX_LINEA (16*200000)
 #define CACA_LOG_MAX_TAM_CADENA 2000
 
-#define CACA_COMUN_BUF_STATICO (char[1000] ) { '\0' }
+#define CACA_COMUN_BUF_STATICO NULL
 
 #define BITCH_VECTOR_NUM_BITS (sizeof(bitch_vector) * 8)
 
@@ -358,42 +357,6 @@ static inline natural caca_comun_max_natural(natural *nums, natural nums_tam) {
 	}
 
 	return max;
-}
-
-// XXX: https://stackoverflow.com/questions/122616/how-do-i-trim-leading-trailing-whitespace-in-a-standard-way?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
-static inline char *caca_comun_trimea(char *cad, natural cad_tam) {
-	char c = cad[0];
-	char tmp = '\0';
-	natural i = 0;
-	natural j = 0;
-
-	caca_log_debug("entrada %s cad_tam %u", cad, cad_tam);
-	while (j < cad_tam && cad[j] != '\0') {
-		caca_log_debug("en j %u car %c", j, cad[j]);
-		while (j < cad_tam && !isalpha(cad[j])) {
-			caca_log_debug("brincando j %u car %c", j, cad[j]);
-			j++;
-		}
-		caca_log_debug("aora j %u car %c", j, cad[j]);
-		if (j == cad_tam) {
-			caca_log_debug("q ped");
-			break;
-		}
-		tmp = cad[i];
-		cad[i] = cad[j];
-		cad[j] = tmp;
-		i++;
-		j++;
-	}
-	caca_log_debug("mierda '%c'", cad[j]);
-
-	i = 0;
-	while (isalpha(cad[i++]))
-		;
-	caca_log_debug("salida %s", cad);
-	cad[i - 1] = '\0';
-
-	return cad;
 }
 
 #endif
@@ -1713,33 +1676,6 @@ static inline void *cola_conteo_torpe(cola_conteo *cola) {
 
 #endif
 
-static inline hm_iter pon_en_ht(hm_rr_bs_tabla *ht, string &llave,
-		natural valor, hm_iter iter) {
-	if (iter != HASH_MAP_VALOR_INVALIDO) {
-		hash_map_robin_hood_back_shift_indice_pon_valor(ht, iter, valor);
-	} else {
-		booleano nuevo = falso;
-		iter = hash_map_robin_hood_back_shift_pon(ht,
-				(const void *) llave.c_str(), llave.size(), valor, &nuevo);
-		assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
-		assert_timeout(nuevo);
-	}
-	return iter;
-}
-
-static inline natural obten_de_ht(hm_rr_bs_tabla *ht, string &llave,
-		hm_iter *iter) {
-	hm_iter iter_int = HASH_MAP_VALOR_INVALIDO;
-	entero_largo valor = 0;
-
-	iter_int = hash_map_robin_hood_back_shift_obten(ht, (void *) llave.c_str(),
-			llave.size(), &valor);
-
-	*iter = iter_int;
-
-	return valor;
-}
-
 cola_conteo_llave *word_crap_obten_llave(void *elemento,
 		cola_conteo_llave *llave_mem) {
 	string *p = (string *) elemento;
@@ -1801,7 +1737,7 @@ int main() {
 			getline(cin, *s);
 			caca_log_debug("mierda %s", s->c_str());
 // XXX: https://stackoverflow.com/questions/3418231/replace-part-of-a-string-with-another-string
-			(*s) = std::regex_replace(*s, std::regex("\\s+"), "");
+//			(*s) = std::regex_replace(*s, std::regex("\\s+"), "");
 			if ((*s).empty()) {
 				continue;
 			}
