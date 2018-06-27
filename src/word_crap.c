@@ -1259,10 +1259,10 @@ static inline void heap_shit_push_down(heap_shit *heap_ctx, natural idx) {
 		heap_shit_nodo *nodo_sig = &nodo;
 		if ((heap_ctx->min
 				&& heap_ctx->compara_prioridad_fn(nodo.valor,
-						heap[idx_hijo_izq].valor) > 1)
+						heap[idx_hijo_izq].valor) > 0)
 				|| (!heap_ctx->min
 						&& heap_ctx->compara_prioridad_fn(nodo.valor,
-								heap[idx_hijo_izq].valor) < 1)) {
+								heap[idx_hijo_izq].valor) < 0)) {
 			idx_hijo = idx_hijo_izq;
 			nodo_sig = heap + idx_hijo;
 		}
@@ -1270,11 +1270,11 @@ static inline void heap_shit_push_down(heap_shit *heap_ctx, natural idx) {
 		if (heap_shit_idx_hijo_der(idx) <= heap_size
 				&& ((heap_ctx->min
 						&& heap_ctx->compara_prioridad_fn(nodo_sig->valor,
-								heap[idx_hijo_der].valor) > 1)
+								heap[idx_hijo_der].valor) > 0)
 						|| (!heap_ctx->min
 								&& heap_ctx->compara_prioridad_fn(
 										nodo_sig->valor,
-										heap[idx_hijo_der].valor) < 1))) {
+										heap[idx_hijo_der].valor) < 0))) {
 			idx_hijo = idx_hijo_der;
 			nodo_sig = heap + idx_hijo;
 		}
@@ -1414,7 +1414,8 @@ static inline void *heap_shit_consulta_torpe(heap_shit *heap_ctx) {
 	if (heap_size) {
 		return heap[1].valor;
 	} else {
-		assert_timeout(!heap_ctx->heap[0].valor);
+		assert_timeout(
+				heap_ctx->heap[0].valor==(void *)HEAP_SHIT_VALOR_INVALIDO);
 		return NULL;
 	}
 }
@@ -1756,6 +1757,7 @@ static inline void word_crap_main() {
 //			getline(&mierda, &fuck, stdin);
 			caca_comun_trimea(mierda, WORD_CRAP_MAX_TAM_CAD);
 			assert_timeout(strlen(p->cadena));
+			assert_timeout(strlen(p->cadena) <= 8);
 			if (strlen(p->cadena) < 1) {
 				continue;
 			}
