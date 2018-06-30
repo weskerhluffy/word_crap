@@ -1523,50 +1523,6 @@ struct my_list* list_new(void) {
 	return p;
 }
 
-static void list_iterador_init(listilla_fifo *ctx, listilla_iterador *iter) {
-	assert_timeout(!iter->ctx);
-	assert_timeout(!iter->primera_llamada);
-	assert_timeout(!iter->nodo_act);
-	assert_timeout(!iter->llamadas);
-	iter->ctx = ctx;
-	iter->nodo_act = NULL;
-	iter->primera_llamada = verdadero;
-	iter->llamadas = 0;
-}
-static void list_iterador_fini(listilla_iterador *iter) {
-	iter->ctx = NULL;
-	iter->nodo_act = NULL;
-	iter->primera_llamada = falso;
-	iter->llamadas = 0;
-}
-
-static void *list_iterador_obten_siguiente(listilla_iterador *iter) {
-	if (iter->nodo_act) {
-		iter->nodo_act = iter->nodo_act->next;
-	} else {
-		if (iter->primera_llamada) {
-			iter->primera_llamada = falso;
-			iter->nodo_act = iter->ctx->head;
-		}
-	}
-	if (iter->nodo_act) {
-		iter->llamadas++;
-	}
-	return iter->nodo_act ? iter->nodo_act->valor : NULL;
-}
-static void *list_iterador_hay_siguiente(listilla_iterador *iter) {
-	listilla_nodo *siguiente = NULL;
-	if (!iter->nodo_act) {
-		if (iter->primera_llamada) {
-			siguiente = iter->ctx->head;
-		}
-	} else {
-		siguiente = iter->nodo_act->next;
-	}
-
-	return siguiente ? siguiente->valor : NULL;
-}
-
 #endif
 
 typedef struct cola_conteo_llave {
@@ -1771,70 +1727,6 @@ static inline char *palabra_a_cadena(void *elemento, char *buffer) {
 	return buffer;
 }
 
-static inline void *fuerza_bruta(cola_conteo *cola) {
-	listilla_fifo *l = cola->elementos;
-	listilla_iterador *it = &(listilla_iterador ) { 0 };
-	hm_rr_bs_tabla *h = &(hm_rr_bs_tabla ) { 0 };
-	natural maxc = 0;
-	palabra *maxp = NULL;
-	cola_conteo_elem *ce = NULL;
-
-	caca_log_debug("assshit");
-	hash_map_robin_hood_back_shift_init(h, COLA_CONTEO_MAX_ELEMS + 1);
-	list_iterador_init(l, it);
-
-	while (list_iterador_hay_siguiente(it)) {
-		cola_conteo_llave *llave = &(cola_conteo_llave ) { 0 };
-		palabra *elem = list_iterador_obten_siguiente(it);
-		entero_largo_sin_signo c = 0;
-		bool nuevo = falso;
-		hm_iter iter = 0;
-
-		llave->contenido = elem->cadena;
-		llave->contenido_tam = elem->cadena_tam;
-		caca_log_debug("cagada %s", llave->contenido);
-
-		iter = hash_map_robin_hood_back_shift_obten(h, llave->contenido,
-				llave->contenido_tam, (entero_largo*) &c);
-
-		if (iter == HASH_MAP_VALOR_INVALIDO) {
-			c = 0;
-			caca_log_debug("%s no staba", elem->cadena);
-			iter = hash_map_robin_hood_back_shift_pon(h, llave->contenido,
-					llave->contenido_tam, c, &nuevo);
-
-			assert_timeout(nuevo);
-		}
-		c++;
-		hash_map_robin_hood_back_shift_indice_pon_valor(h, iter, c);
-		caca_log_debug("palabra %s tiene %u", elem->cadena, c);
-
-		if (c >= maxc) {
-			if (!maxp) {
-				maxp = elem;
-			} else {
-				if (c > maxc
-						|| (strncmp(elem->cadena, maxp->cadena,
-								caca_comun_min(elem->cadena_tam,
-										maxp->cadena_tam)) < 1)) {
-					maxp = elem;
-				}
-			}
-			maxc = c;
-		}
-	}
-	caca_log_debug("palabra max %s tiene %u", maxp->cadena, maxc);
-
-	list_iterador_fini(it);
-	hash_map_robin_hood_back_shift_fini(h);
-
-	ce = heap_shit_consulta_prioridad(cola->monton_conteo_elementos,
-			maxp->cadena, maxp->cadena_tam);
-	assert_timeout(ce->conteo == maxc);
-
-	return ce;
-}
-
 static inline void word_crap_main() {
 	natural t = 0;
 
@@ -1872,9 +1764,9 @@ static inline void word_crap_main() {
 			 */
 			fgets(p->cadena, WORD_CRAP_MAX_TAM_CAD, stdin);
 //			getline(&mierda, &fuck, stdin);
-			caca_comun_trimea(mierda, WORD_CRAP_MAX_TAM_CAD);
-			assert_timeout(strlen(p->cadena));
-			assert_timeout(strlen(p->cadena) <= 8);
+//			caca_comun_trimea(mierda, WORD_CRAP_MAX_TAM_CAD);
+//			assert_timeout(strlen(p->cadena));
+//			assert_timeout(strlen(p->cadena) <= 8);
 			if (strlen(p->cadena) < 1) {
 				continue;
 			}
@@ -1886,7 +1778,7 @@ static inline void word_crap_main() {
 
 			cc = cola_conteo_torpe(caca);
 			assert_timeout(cc);
-			assert_timeout(cc == fuerza_bruta(caca));
+//			assert_timeout(cc == fuerza_bruta(caca));
 			r = cc->elemento;
 			assert_timeout(r);
 
